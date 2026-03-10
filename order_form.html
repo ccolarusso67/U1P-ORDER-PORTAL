@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ultra1Plus — Order Form</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="products_data.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black:  #000000;
+      --gold:   #FFC700;
+      --white:  #ffffff;
+      --gray-1: #f6f6f6;
+      --gray-2: #e5e5e5;
+      --gray-3: #999999;
+      --gray-4: #333333;
+      --red:    #cc2200;
+      --green:  #1a6b3c;
+      --radius: 0px;
+    }
+
+    body {
+      font-family: 'Inter', 'Rubik', sans-serif;
+      background: var(--gray-1);
+      color: var(--gray-4);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--black);
+      padding: 0 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 80px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      border-bottom: 3px solid var(--gold);
+    }
+    header .logo img {
+      height: 48px;
+      display: block;
+    }
+    header .page-title {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--white);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    header .page-title span { color: var(--gold); }
+
+    /* ── Hero banner ── */
+    .hero {
+      background: var(--black);
+      color: var(--white);
+      text-align: center;
+      padding: 48px 20px 56px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 4px;
+      background: var(--gold);
+    }
+    .hero h2 {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 800;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      line-height: 1.1;
+    }
+    .hero h2 em {
+      color: var(--gold);
+      font-style: normal;
+    }
+    .hero p {
+      margin-top: 12px;
+      font-size: .95rem;
+      color: #aaa;
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* ── Layout ── */
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 40px 20px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* ── Section header ── */
+    .section-label {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 0;
+    }
+    .section-label .step-num {
+      background: var(--gold);
+      color: var(--black);
+      font-family: 'Rubik', sans-serif;
+      font-weight: 800;
+      font-size: 1.1rem;
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      clip-path: polygon(15% 0, 100% 0%, 85% 100%, 0% 100%);
+    }
+    .section-label h3 {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 800;
+      font-size: .85rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--black);
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--white);
+      border-top: 3px solid var(--gold);
+      margin-bottom: 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    }
+    .card-head {
+      background: var(--black);
+      color: var(--white);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .card-head .step-badge {
+      background: var(--gold);
+      color: var(--black);
+      font-family: 'Rubik', sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+      width: 34px; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      clip-path: polygon(12% 0, 100% 0%, 88% 100%, 0% 100%);
+    }
+    .card-head h3 {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 700;
+      font-size: .9rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    .card-body { padding: 28px; }
+
+    /* ── Form grid ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .form-grid .span2 { grid-column: span 2; }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    label {
+      font-family: 'Rubik', sans-serif;
+      font-size: .75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--gray-3);
+    }
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="number"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 2px solid var(--gray-2);
+      border-radius: 0;
+      font-family: 'Inter', sans-serif;
+      font-size: .92rem;
+      color: var(--gray-4);
+      outline: none;
+      transition: border-color .15s;
+      background: #fff;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--gold);
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23999' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 36px;
+    }
+    textarea { min-height: 90px; resize: vertical; }
+    input[disabled], select[disabled] { background: var(--gray-1); cursor: not-allowed; color: var(--gray-3); }
+
+    /* ── Product selector row ── */
+    .product-selector {
+      display: grid;
+      grid-template-columns: 2fr 2fr 90px 130px;
+      gap: 16px;
+      align-items: end;
+    }
+    .sub-hint {
+      font-size: .78rem;
+      color: var(--gray-3);
+      margin-top: 5px;
+      min-height: 16px;
+      font-style: italic;
+    }
+
+    /* ── UL Autocomplete ── */
+    .ul-wrap { position: relative; }
+    .ul-dropdown {
+      position: absolute;
+      top: calc(100% + 2px);
+      left: 0; right: 0;
+      background: #fff;
+      border: 2px solid var(--gold);
+      max-height: 280px;
+      overflow-y: auto;
+      z-index: 300;
+      display: none;
+      box-shadow: 4px 4px 20px rgba(0,0,0,.15);
+    }
+    .ul-dropdown.open { display: block; }
+    .ul-option {
+      padding: 11px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--gray-2);
+    }
+    .ul-option:last-child { border-bottom: none; }
+    .ul-option:hover, .ul-option.active { background: #fffaed; }
+    .ul-code {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 700;
+      font-size: .88rem;
+      color: var(--black);
+    }
+    .ul-name { font-size: .78rem; color: var(--gray-3); margin-top: 2px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border: none;
+      font-family: 'Rubik', sans-serif;
+      font-size: .85rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: filter .15s, transform .1s;
+      clip-path: polygon(12% 0, 100% 0%, 88% 100%, 0% 100%);
+      white-space: nowrap;
+    }
+    .btn:active { transform: translateY(1px); }
+
+    .btn-gold { background: var(--gold); color: var(--black); }
+    .btn-gold:hover { filter: brightness(1.06); }
+
+    .btn-black { background: var(--black); color: var(--white); }
+    .btn-black:hover { background: #222; }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--red);
+      border: 2px solid var(--red);
+      clip-path: none;
+      font-size: .78rem;
+      padding: 6px 14px;
+      font-weight: 700;
+    }
+    .btn-outline:hover { background: #fff0ee; }
+
+    .btn-submit {
+      background: var(--gold);
+      color: var(--black);
+      padding: 18px 40px;
+      font-size: 1rem;
+      letter-spacing: 2px;
+      width: 100%;
+      clip-path: none;
+    }
+    .btn-submit:hover { filter: brightness(1.06); }
+    .btn-submit:disabled { background: var(--gray-2); color: var(--gray-3); cursor: not-allowed; }
+
+    /* ── Add button fix (no clip-path) ── */
+    .btn-add {
+      clip-path: none;
+      height: 48px;
+      width: 100%;
+    }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .88rem;
+    }
+    thead { background: var(--black); }
+    thead th {
+      padding: 13px 16px;
+      text-align: left;
+      font-family: 'Rubik', sans-serif;
+      font-weight: 700;
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--white);
+      white-space: nowrap;
+    }
+    thead th.center { text-align: center; }
+    tbody tr { border-bottom: 1px solid var(--gray-2); transition: background .1s; }
+    tbody tr:hover { background: #fffaed; }
+    td { padding: 13px 16px; vertical-align: middle; }
+    td.ul-code-cell {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 800;
+      font-size: .9rem;
+      color: var(--black);
+    }
+    td.sku-cell { font-family: 'Courier New', monospace; font-size: .8rem; color: var(--gray-3); }
+    td.qty-cell {
+      text-align: center;
+      font-family: 'Rubik', sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+    }
+    td.num-cell { color: var(--gray-3); font-size: .8rem; }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--gray-3);
+    }
+    .empty-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: .4; }
+    .empty-state p { font-size: .9rem; }
+
+    /* ── Summary bar ── */
+    .summary-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 28px;
+      background: var(--gray-1);
+      border-top: 2px solid var(--gray-2);
+      font-size: .85rem;
+    }
+    .summary-bar .line-count {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 700;
+    }
+    .summary-bar .line-count span { color: var(--gold); background: var(--black); padding: 2px 10px; margin-left: 8px; }
+
+    /* ── Alert ── */
+    .alert {
+      padding: 12px 16px;
+      font-size: .85rem;
+      margin-bottom: 18px;
+      border-left: 4px solid var(--red);
+      background: #fff5f5;
+      color: var(--red);
+      display: none;
+      font-weight: 500;
+    }
+    .alert.show { display: block; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.75);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--white);
+      border-top: 4px solid var(--gold);
+      max-width: 480px;
+      width: 90%;
+      padding: 48px 40px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    }
+    .modal .icon { font-size: 3.5rem; margin-bottom: 16px; }
+    .modal h2 {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 800;
+      font-size: 1.4rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .modal p { color: var(--gray-3); margin-bottom: 28px; font-size: .92rem; }
+
+    /* ── Footer ── */
+    footer {
+      background: var(--black);
+      color: #555;
+      text-align: center;
+      padding: 28px 20px;
+      font-size: .8rem;
+      border-top: 3px solid var(--gold);
+    }
+    footer a { color: var(--gold); text-decoration: none; }
+    footer strong { color: var(--white); }
+
+    /* ── Responsive ── */
+    @media (max-width: 720px) {
+      header { padding: 0 16px; }
+      .card-body { padding: 18px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid .span2 { grid-column: 1; }
+      .product-selector { grid-template-columns: 1fr; }
+      .hero { padding: 32px 16px 40px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <img src="https://cdn11.bigcommerce.com/s-w94u0bjkb6/images/stencil/original/recurso_1_1757027375__15872.original.png"
+         alt="Ultra1Plus Logo"
+         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+    <span style="display:none; font-family:'Rubik',sans-serif; font-weight:800; font-size:1.4rem; color:#fff;">Ultra<span style="color:#FFC700">1</span>Plus</span>
+  </div>
+  <div class="page-title">Client <span>Order</span> Portal</div>
+</header>
+
+<!-- Hero -->
+<div class="hero">
+  <h2>Place Your <em>Order</em></h2>
+  <p>Select your products, presentations, and quantities below. We'll receive your order and get back to you promptly.</p>
+</div>
+
+<main>
+
+  <!-- Step 1: Client Info -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-badge">1</div>
+      <h3>Your Information</h3>
+    </div>
+    <div class="card-body">
+      <div class="form-grid">
+        <div class="field">
+          <label for="client-name">Full Name *</label>
+          <input type="text" id="client-name" placeholder="John Smith" autocomplete="name" />
+        </div>
+        <div class="field">
+          <label for="client-company">Company *</label>
+          <input type="text" id="client-company" placeholder="ACME Corp" autocomplete="organization" />
+        </div>
+        <div class="field">
+          <label for="client-email">Email Address *</label>
+          <input type="email" id="client-email" placeholder="john@company.com" autocomplete="email" />
+        </div>
+        <div class="field">
+          <label for="client-phone">Phone Number</label>
+          <input type="tel" id="client-phone" placeholder="+1 (555) 000-0000" autocomplete="tel" />
+        </div>
+        <div class="field span2">
+          <label for="client-address">Shipping Address</label>
+          <input type="text" id="client-address" placeholder="Street, City, State, ZIP" autocomplete="street-address" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Add Products -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-badge">2</div>
+      <h3>Select Products</h3>
+    </div>
+    <div class="card-body">
+      <div id="add-alert" class="alert"></div>
+      <div class="product-selector">
+
+        <!-- UL Search -->
+        <div class="field">
+          <label for="ul-input">UL Number</label>
+          <div class="ul-wrap">
+            <input type="text" id="ul-input" placeholder="Search UL number or product name…" autocomplete="off" />
+            <div id="ul-dropdown" class="ul-dropdown"></div>
+          </div>
+          <div class="sub-hint" id="product-name-display"></div>
+        </div>
+
+        <!-- Presentation -->
+        <div class="field">
+          <label for="presentation-select">Presentation</label>
+          <select id="presentation-select" disabled>
+            <option value="">— Select UL number first —</option>
+          </select>
+          <div class="sub-hint" id="sku-display"></div>
+        </div>
+
+        <!-- Quantity -->
+        <div class="field">
+          <label for="qty-input">Quantity</label>
+          <input type="number" id="qty-input" min="1" value="1" placeholder="1" />
+        </div>
+
+        <!-- Add Button -->
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn btn-gold btn-add" onclick="addToOrder()">+ Add</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Order Summary -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-badge">3</div>
+      <h3>Order Summary</h3>
+    </div>
+    <div class="table-wrap">
+      <table id="order-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>UL Number</th>
+            <th>Product Name</th>
+            <th>Presentation</th>
+            <th>SKU</th>
+            <th class="center">Qty</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="order-tbody">
+          <tr id="empty-row">
+            <td colspan="7">
+              <div class="empty-state">
+                <div class="empty-icon">&#128722;</div>
+                <p>No products added yet.<br>Use the selector above to add items to your order.</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="summary-bar" id="summary-bar" style="display:none">
+      <div class="line-count">
+        Line items: <span id="item-count">0</span>
+      </div>
+      <button class="btn btn-outline" onclick="clearOrder()">&#x2715; Clear All</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Submit -->
+  <div class="card">
+    <div class="card-head">
+      <div class="step-badge">4</div>
+      <h3>Notes &amp; Submit</h3>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:20px;">
+      <div class="field">
+        <label for="order-notes">Additional Notes / Special Instructions</label>
+        <textarea id="order-notes" placeholder="Delivery instructions, special requirements, preferred shipping date…"></textarea>
+      </div>
+      <div id="submit-alert" class="alert"></div>
+      <button class="btn btn-submit" onclick="submitOrder()">
+        &#9993;&nbsp; Submit Order via Email
+      </button>
+      <p style="text-align:center;font-size:.78rem;color:var(--gray-3);">
+        Clicking Submit will open your email client with the complete order pre-filled and ready to send.
+      </p>
+    </div>
+  </div>
+
+</main>
+
+<!-- Success Modal -->
+<div class="modal-overlay" id="success-modal">
+  <div class="modal">
+    <div class="icon">&#10003;</div>
+    <h2>Order Submitted!</h2>
+    <p>Your email client has opened with the order details. Please click <strong>Send</strong> to complete your request.</p>
+    <button class="btn btn-gold" style="clip-path:none;padding:14px 36px;font-size:.9rem;" onclick="closeModal()">
+      Place Another Order
+    </button>
+  </div>
+</div>
+
+<footer>
+  &copy; 2025 <strong>Ultra1Plus</strong> &mdash; Ultrachem LLC. All rights reserved. &nbsp;|&nbsp;
+  <a href="https://ultra1plus.com" target="_blank">ultra1plus.com</a>
+</footer>
+
+<script>
+// ─────────────────────────────────────────────────
+//  CONFIG — update this email address
+// ─────────────────────────────────────────────────
+const ORDER_EMAIL = 'orders@ultra1plus.com';
+
+// ─────────────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────────────
+let orderItems   = [];
+let selectedCode = null;
+let selectedName = null;
+
+// ─────────────────────────────────────────────────
+//  UL Autocomplete
+// ─────────────────────────────────────────────────
+const ulInput           = document.getElementById('ul-input');
+const ulDropdown        = document.getElementById('ul-dropdown');
+const productNameDisp   = document.getElementById('product-name-display');
+const presSelect        = document.getElementById('presentation-select');
+const skuDisp           = document.getElementById('sku-display');
+
+const ALL_CODES = Object.keys(PRODUCTS).sort();
+
+function renderDropdown(query) {
+  const q = query.toLowerCase().trim();
+  const matches = q === ''
+    ? ALL_CODES.slice(0, 100)
+    : ALL_CODES.filter(code => {
+        const name = (PRODUCTS[code].name || '').toLowerCase();
+        return code.toLowerCase().includes(q) || name.includes(q);
+      }).slice(0, 100);
+
+  ulDropdown.innerHTML = '';
+  if (matches.length === 0) {
+    ulDropdown.innerHTML = '<div class="ul-option" style="color:#aaa;cursor:default">No results found</div>';
+  } else {
+    matches.forEach(code => {
+      const div = document.createElement('div');
+      div.className = 'ul-option';
+      div.innerHTML = `<div class="ul-code">${code}</div><div class="ul-name">${PRODUCTS[code].name || ''}</div>`;
+      div.addEventListener('mousedown', e => { e.preventDefault(); selectCode(code); });
+      ulDropdown.appendChild(div);
+    });
+  }
+  ulDropdown.classList.add('open');
+}
+
+ulInput.addEventListener('input', () => {
+  selectedCode = null; selectedName = null;
+  productNameDisp.textContent = '';
+  resetPresentation();
+  renderDropdown(ulInput.value);
+});
+ulInput.addEventListener('focus', () => renderDropdown(ulInput.value));
+ulInput.addEventListener('blur',  () => setTimeout(() => ulDropdown.classList.remove('open'), 160));
+
+function selectCode(code) {
+  selectedCode = code;
+  selectedName = PRODUCTS[code].name || code;
+  ulInput.value = code;
+  productNameDisp.textContent = selectedName;
+  ulDropdown.classList.remove('open');
+  populatePresentations(code);
+}
+
+function resetPresentation() {
+  presSelect.innerHTML = '<option value="">— Select UL number first —</option>';
+  presSelect.disabled = true;
+  skuDisp.textContent = '';
+}
+
+function populatePresentations(code) {
+  const list = PRODUCTS[code].presentations;
+  presSelect.innerHTML = '<option value="">— Select presentation —</option>';
+  list.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.presentation;
+    opt.textContent = p.presentation;
+    opt.dataset.sku = p.sku;
+    presSelect.appendChild(opt);
+  });
+  presSelect.disabled = false;
+  skuDisp.textContent = '';
+  if (list.length === 1) {
+    presSelect.selectedIndex = 1;
+    skuDisp.textContent = 'SKU: ' + list[0].sku;
+  }
+}
+
+presSelect.addEventListener('change', () => {
+  const opt = presSelect.options[presSelect.selectedIndex];
+  skuDisp.textContent = opt && opt.dataset.sku ? 'SKU: ' + opt.dataset.sku : '';
+});
+
+// ─────────────────────────────────────────────────
+//  Add to Order
+// ─────────────────────────────────────────────────
+function addToOrder() {
+  const alertEl = document.getElementById('add-alert');
+  alertEl.classList.remove('show');
+
+  if (!selectedCode)   { return showAlert(alertEl, 'Please select a UL number.'); }
+  if (!presSelect.value) { return showAlert(alertEl, 'Please select a presentation.'); }
+
+  const qty = parseInt(document.getElementById('qty-input').value, 10);
+  if (!qty || qty < 1) { return showAlert(alertEl, 'Please enter a valid quantity (minimum 1).'); }
+
+  const opt = presSelect.options[presSelect.selectedIndex];
+  const sku = opt ? (opt.dataset.sku || '') : '';
+
+  const existing = orderItems.find(i => i.code === selectedCode && i.presentation === presSelect.value);
+  if (existing) {
+    existing.qty += qty;
+  } else {
+    orderItems.push({ code: selectedCode, name: selectedName, presentation: presSelect.value, sku, qty });
+  }
+
+  renderTable();
+  resetForm();
+}
+
+function resetForm() {
+  ulInput.value = ''; selectedCode = null; selectedName = null;
+  productNameDisp.textContent = '';
+  resetPresentation();
+  document.getElementById('qty-input').value = 1;
+  document.getElementById('add-alert').classList.remove('show');
+}
+
+// ─────────────────────────────────────────────────
+//  Render Table
+// ─────────────────────────────────────────────────
+function renderTable() {
+  const tbody      = document.getElementById('order-tbody');
+  const emptyRow   = document.getElementById('empty-row');
+  const summaryBar = document.getElementById('summary-bar');
+  const itemCount  = document.getElementById('item-count');
+
+  if (orderItems.length === 0) {
+    tbody.innerHTML = '';
+    tbody.appendChild(emptyRow);
+    summaryBar.style.display = 'none';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  orderItems.forEach((item, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="num-cell">${idx + 1}</td>
+      <td class="ul-code-cell">${item.code}</td>
+      <td>${item.name}</td>
+      <td>${item.presentation}</td>
+      <td class="sku-cell">${item.sku}</td>
+      <td class="qty-cell">${item.qty}</td>
+      <td><button class="btn btn-outline" onclick="removeItem(${idx})">Remove</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  summaryBar.style.display = 'flex';
+  itemCount.textContent = orderItems.length;
+}
+
+function removeItem(idx) {
+  orderItems.splice(idx, 1);
+  renderTable();
+}
+
+function clearOrder() {
+  if (confirm('Remove all items from the order?')) {
+    orderItems = [];
+    renderTable();
+  }
+}
+
+// ─────────────────────────────────────────────────
+//  Submit via mailto
+// ─────────────────────────────────────────────────
+function submitOrder() {
+  const alertEl = document.getElementById('submit-alert');
+  alertEl.classList.remove('show');
+
+  const name    = document.getElementById('client-name').value.trim();
+  const company = document.getElementById('client-company').value.trim();
+  const email   = document.getElementById('client-email').value.trim();
+  const phone   = document.getElementById('client-phone').value.trim();
+  const address = document.getElementById('client-address').value.trim();
+  const notes   = document.getElementById('order-notes').value.trim();
+
+  if (!name)              return showAlert(alertEl, 'Please enter your full name.');
+  if (!company)           return showAlert(alertEl, 'Please enter your company name.');
+  if (!email)             return showAlert(alertEl, 'Please enter your email address.');
+  if (orderItems.length === 0) return showAlert(alertEl, 'Please add at least one product before submitting.');
+
+  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const line = '─'.repeat(60);
+  let body = `ULTRA1PLUS ORDER REQUEST\n${line}\nDate: ${date}\n\n`;
+  body += `CLIENT INFORMATION\n`;
+  body += `Name:    ${name}\n`;
+  body += `Company: ${company}\n`;
+  body += `Email:   ${email}\n`;
+  if (phone)   body += `Phone:   ${phone}\n`;
+  if (address) body += `Ship to: ${address}\n`;
+  body += `\n${line}\n\nORDER DETAILS\n\n`;
+
+  const col = (s, w) => String(s).padEnd(w).slice(0, w);
+  body += col('#',  3) + col('UL Number', 12) + col('Presentation', 28) + col('SKU', 26) + 'Qty\n';
+  body += '─'.repeat(75) + '\n';
+  orderItems.forEach((item, i) => {
+    body += col(i + 1, 3) + col(item.code, 12) + col(item.presentation, 28) + col(item.sku, 26) + item.qty + '\n';
+  });
+
+  body += `\n${line}\n`;
+  if (notes) body += `\nNOTES\n${notes}\n`;
+  body += `\nTotal line items: ${orderItems.length}\n`;
+  body += `\n${line}\nThis order was placed via the Ultra1Plus Client Order Portal.\n`;
+
+  const subject = encodeURIComponent(`Order Request — ${company} — ${date}`);
+  const bodyEnc = encodeURIComponent(body);
+
+  window.location.href = `mailto:${ORDER_EMAIL}?subject=${subject}&body=${bodyEnc}`;
+
+  setTimeout(() => document.getElementById('success-modal').classList.add('open'), 600);
+}
+
+// ─────────────────────────────────────────────────
+//  Modal + helpers
+// ─────────────────────────────────────────────────
+function closeModal() {
+  document.getElementById('success-modal').classList.remove('open');
+  orderItems = [];
+  renderTable();
+  ['client-name','client-company','client-email','client-phone','client-address','order-notes']
+    .forEach(id => document.getElementById(id).value = '');
+  resetForm();
+}
+
+function showAlert(el, msg) {
+  el.textContent = msg;
+  el.classList.add('show');
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+</script>
+</body>
+</html>
