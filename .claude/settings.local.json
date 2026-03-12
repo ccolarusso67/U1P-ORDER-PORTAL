@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Desktop_Commander__start_process",
+      "Bash(where python:*)",
+      "Bash(where python3:*)",
+      "Bash(where node:*)",
+      "Bash(node -e \":*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"const XLSX = require\\(''xlsx''\\); console.log\\(''ok''\\)\")",
+      "Bash(node gen_prices.js)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(node gen_products.js)"
+    ]
+  }
+}
