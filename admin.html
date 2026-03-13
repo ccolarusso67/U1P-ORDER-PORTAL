@@ -430,8 +430,15 @@
 
     <div class="section-header">
       <h2 class="section-title">Customers</h2>
-      <button class="btn btn-primary" onclick="toggleForm('customer-form')">+ Add Customer</button>
+      <div class="flex-row gap-8">
+        <button class="btn btn-primary" onclick="toggleForm('customer-form')">+ Add Customer</button>
+        <button class="btn btn-primary" onclick="document.getElementById('csv-file-input').click()">Upload CSV</button>
+        <input type="file" id="csv-file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleBulkUpload(this)" />
+        <a href="customer_template.xlsx" download class="btn btn-outline" style="text-decoration:none">Download Template</a>
+      </div>
     </div>
+
+    <div id="bulk-upload-alert" class="alert"></div>
 
     <div class="inline-form" id="customer-form">
       <h3 id="customer-form-title">Add Customer</h3>
@@ -1197,6 +1204,119 @@ function exportOrdersCSV() {
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
   a.download = `orders-export-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
+}
+
+// ─────────────────────────────────────────────────
+//  BULK UPLOAD
+// ─────────────────────────────────────────────────
+async function handleBulkUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  showLoading();
+  try {
+    let rows;
+    if (file.name.endsWith('.csv')) {
+      const text = await file.text();
+      rows = parseCSV(text);
+    } else {
+      hideLoading();
+      return showAlert('bulk-upload-alert', 'Please save your Excel file as CSV first, then upload the .csv file.', 'error');
+    }
+
+    if (rows.length === 0) {
+      hideLoading();
+      return showAlert('bulk-upload-alert', 'No data rows found in file.', 'error');
+    }
+
+    let added = 0, skipped = 0, errors = [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r.name || !r.email || !r.password) {
+        errors.push(`Row ${i + 2}: Missing required field (name, email, or password)`);
+        skipped++;
+        continue;
+      }
+      if (r.password.length < 6) {
+        errors.push(`Row ${i + 2}: Password too short for ${r.email}`);
+        skipped++;
+        continue;
+      }
+      const result = await supaAddCustomer({
+        name: r.name,
+        company: r.company || '',
+        email: r.email,
+        phone: r.phone || '',
+        address: r.address || '',
+        password: r.password,
+        is_admin: false
+      });
+      if (result.success) {
+        added++;
+      } else {
+        errors.push(`Row ${i + 2}: ${r.email} — ${result.error}`);
+        skipped++;
+      }
+    }
+
+    await loadCustomers();
+    populatePricingCustomerDropdown();
+
+    let msg = `Upload complete: ${added} customers added`;
+    if (skipped > 0) msg += `, ${skipped} skipped`;
+    if (errors.length > 0) msg += '. Issues: ' + errors.join('; ');
+    showAlert('bulk-upload-alert', msg, added > 0 ? 'success' : 'error');
+  } catch (e) {
+    showAlert('bulk-upload-alert', 'Upload failed: ' + e.message, 'error');
+  }
+  hideLoading();
+}
+
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z]/g, ''));
+  const colMap = {};
+  headers.forEach((h, i) => {
+    if (h.includes('name') && !h.includes('company')) colMap.name = i;
+    else if (h.includes('company') || h.includes('business')) colMap.company = i;
+    else if (h.includes('email')) colMap.email = i;
+    else if (h.includes('phone')) colMap.phone = i;
+    else if (h.includes('address')) colMap.address = i;
+    else if (h.includes('password')) colMap.password = i;
+  });
+
+  return lines.slice(1).map(line => {
+    const cols = parseCSVLine(line);
+    return {
+      name: (cols[colMap.name] || '').trim(),
+      company: (cols[colMap.company] || '').trim(),
+      email: (cols[colMap.email] || '').trim(),
+      phone: (cols[colMap.phone] || '').trim(),
+      address: (cols[colMap.address] || '').trim(),
+      password: (cols[colMap.password] || '').trim()
+    };
+  }).filter(r => r.name || r.email);
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '', inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+      else if (ch === '"') inQuotes = false;
+      else current += ch;
+    } else {
+      if (ch === '"') inQuotes = true;
+      else if (ch === ',') { result.push(current); current = ''; }
+      else current += ch;
+    }
+  }
+  result.push(current);
+  return result;
 }
 
 // ─────────────────────────────────────────────────
