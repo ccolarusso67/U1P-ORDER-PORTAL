@@ -464,6 +464,15 @@
           <label>Address</label>
           <input type="text" id="cust-address" placeholder="Shipping address" />
         </div>
+        <div class="form-group">
+          <label>Shipping Type</label>
+          <select id="cust-shipping-type">
+            <option value="">— Not set —</option>
+            <option value="FTL">Full Truck Load (44,000 lbs)</option>
+            <option value="CONTAINER_40">40' Container (20 pallets / 55,000 lbs)</option>
+            <option value="CONTAINER_20">20' Container (10 pallets / 42,000 lbs)</option>
+          </select>
+        </div>
         <div class="form-group" id="cust-password-group">
           <label>Password</label>
           <input type="text" id="cust-password" placeholder="Initial password" />
@@ -490,13 +499,14 @@
           <th>Company</th>
           <th>Email</th>
           <th>Phone</th>
+          <th>Shipping</th>
           <th>Admin</th>
           <th>Active</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody id="customers-tbody">
-        <tr><td colspan="7" class="text-center text-muted" style="padding:24px">Loading customers...</td></tr>
+        <tr><td colspan="8" class="text-center text-muted" style="padding:24px">Loading customers...</td></tr>
       </tbody>
     </table>
 
@@ -754,15 +764,17 @@ async function loadCustomers() {
 function renderCustomers() {
   const tbody = document.getElementById('customers-tbody');
   if (customers.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:24px">No customers found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted" style="padding:24px">No customers found</td></tr>';
     return;
   }
+  const shippingLabels = { FTL: 'FTL', CONTAINER_40: "40' Cont.", CONTAINER_20: "20' Cont." };
   tbody.innerHTML = customers.map(c => `
     <tr>
       <td>${esc(c.name || '')}</td>
       <td>${esc(c.company || '')}</td>
       <td>${esc(c.email || '')}</td>
       <td>${esc(c.phone || '')}</td>
+      <td><span class="badge" style="background:${c.shipping_type ? '#e6f4ea' : '#f5f5f5'};color:${c.shipping_type ? '#1a6b3c' : '#999'}">${c.shipping_type ? shippingLabels[c.shipping_type] || c.shipping_type : '—'}</span></td>
       <td><span class="badge ${c.is_admin ? 'badge-yes' : 'badge-no'}">${c.is_admin ? 'Yes' : 'No'}</span></td>
       <td><span class="badge ${c.is_active !== false ? 'badge-yes' : 'badge-no'}">${c.is_active !== false ? 'Yes' : 'No'}</span></td>
       <td>
@@ -793,6 +805,7 @@ function resetCustomerForm() {
   document.getElementById('cust-email').value = '';
   document.getElementById('cust-phone').value = '';
   document.getElementById('cust-address').value = '';
+  document.getElementById('cust-shipping-type').value = '';
   document.getElementById('cust-password').value = '';
   document.getElementById('cust-is-admin').checked = false;
   document.getElementById('customer-form-title').textContent = 'Add Customer';
@@ -809,6 +822,7 @@ function editCustomer(id) {
   document.getElementById('cust-email').value = c.email || '';
   document.getElementById('cust-phone').value = c.phone || '';
   document.getElementById('cust-address').value = c.address || '';
+  document.getElementById('cust-shipping-type').value = c.shipping_type || '';
   document.getElementById('cust-password').value = '';
   document.getElementById('cust-is-admin').checked = !!c.is_admin;
   document.getElementById('customer-form-title').textContent = 'Edit Customer';
@@ -826,6 +840,7 @@ async function saveCustomer() {
     email: document.getElementById('cust-email').value.trim(),
     phone: document.getElementById('cust-phone').value.trim(),
     address: document.getElementById('cust-address').value.trim(),
+    shipping_type: document.getElementById('cust-shipping-type').value || null,
     is_admin: document.getElementById('cust-is-admin').checked
   };
 

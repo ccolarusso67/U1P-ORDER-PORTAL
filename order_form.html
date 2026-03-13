@@ -668,6 +668,27 @@
       <button class="btn btn-outline" onclick="exportCSV()">&#x21E9; Export CSV</button>
       <button class="btn btn-outline" onclick="clearOrder()">&#x2715; Clear All</button>
     </div>
+
+    <!-- Capacity Meter -->
+    <div id="capacity-meter" style="display:none;background:#fff;border-top:3px solid var(--gold);padding:16px 20px;margin-top:8px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-family:'Rubik',sans-serif;font-weight:700;font-size:.82rem;text-transform:uppercase;letter-spacing:1px;color:var(--gray-4);" id="capacity-label">FULL TRUCK LOAD</span>
+        <span style="font-size:.85rem;font-weight:600;" id="capacity-pct">0%</span>
+      </div>
+      <div style="background:#e5e5e5;border-radius:6px;height:20px;overflow:hidden;position:relative;">
+        <div id="capacity-fill" style="height:100%;border-radius:6px;transition:width .3s;background:var(--gold);width:0%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:.78rem;color:var(--gray-3);">
+        <span id="capacity-weight-info">0 / 44,000 lbs</span>
+        <span id="capacity-remaining">44,000 lbs remaining</span>
+      </div>
+      <div id="capacity-pallet-info" style="margin-top:6px;font-size:.78rem;color:var(--gray-3);display:none;">
+        <span id="capacity-pallet-text"></span>
+      </div>
+      <div id="capacity-warning" style="display:none;margin-top:8px;padding:8px 12px;background:#fff5f5;border-left:3px solid var(--red);font-size:.82rem;color:var(--red);font-weight:600;">
+        ⚠ Order exceeds shipping capacity!
+      </div>
+    </div>
   </div>
 
   <!-- Step 4: Submit -->
@@ -728,6 +749,41 @@ function signOut() {
 //  CONFIG
 // ─────────────────────────────────────────────────
 const ORDER_EMAIL = 'orders@ultra1plus.com';
+
+// Shipping capacity limits
+const SHIPPING_LIMITS = {
+  FTL:          { label: 'FULL TRUCK LOAD',  maxLbs: 44000, maxPallets: null },
+  CONTAINER_40: { label: "40' CONTAINER",    maxLbs: 55000, maxPallets: 20 },
+  CONTAINER_20: { label: "20' CONTAINER",    maxLbs: 42000, maxPallets: 10 },
+};
+
+// Units per pallet per presentation (from pallet data)
+const UNITS_PER_PALLET = {
+  'TOTE (265G)': 1,
+  'TOTE (250G)': 1,
+  'TOTE (330G)': 1,
+  'DRUM (55G)': 4,
+  'PAIL (5G)': 56,
+  'BOX (4G)': 60,
+  'BOX (6G)': 36,
+  'BOX (3/5QTS)': 60,
+  'BOX (12Q)': 84,
+  'BOX (2G)': 60,
+  'BOX (3Q)': 84,
+  'BOX (6Q)': 84,
+  'BOX (1 X 2.5G)': 92,
+  'BOX (2 X 2.5G)': 44,
+  'JERRYCAN (20L)': 48,
+  'GAL': 60,
+  'QUART': 84,
+  'JUG': 60,
+  '2X5 QTS JUG': 60,
+  'KEG (120LBS)': 4,
+  '14OZ GREASE CARTRIDGE': 100,
+  'CASE 10/1': 84,
+  '5 Pack QT (Gal + QT)': 60,
+  '6 Pack QT (Gal + 2QT)': 60,
+};
 
 // ─────────────────────────────────────────────────
 //  Data loaded from Supabase
@@ -1007,6 +1063,68 @@ function renderTable() {
     } else {
       weightBar.style.display = 'none';
     }
+  }
+
+  // Update capacity meter
+  updateCapacityMeter(totalWeightLbs, hasAnyWeight);
+}
+
+function updateCapacityMeter(totalWeightLbs, hasAnyWeight) {
+  const meter = document.getElementById('capacity-meter');
+  const shippingType = _session.shipping_type;
+  if (!shippingType || !SHIPPING_LIMITS[shippingType] || orderItems.length === 0) {
+    meter.style.display = 'none';
+    return;
+  }
+
+  const limit = SHIPPING_LIMITS[shippingType];
+  meter.style.display = '';
+  document.getElementById('capacity-label').textContent = limit.label;
+
+  // Weight capacity
+  const pct = Math.min((totalWeightLbs / limit.maxLbs) * 100, 100);
+  const fill = document.getElementById('capacity-fill');
+  fill.style.width = pct.toFixed(1) + '%';
+  fill.style.background = pct > 95 ? 'var(--red)' : pct > 80 ? '#ff9900' : 'var(--gold)';
+  document.getElementById('capacity-pct').textContent = pct.toFixed(0) + '%';
+  document.getElementById('capacity-pct').style.color = pct > 95 ? 'var(--red)' : 'var(--gray-4)';
+
+  const remaining = Math.max(limit.maxLbs - totalWeightLbs, 0);
+  document.getElementById('capacity-weight-info').textContent =
+    `${totalWeightLbs.toLocaleString('en-US', {maximumFractionDigits:0})} / ${limit.maxLbs.toLocaleString()} lbs`;
+  document.getElementById('capacity-remaining').textContent =
+    `${remaining.toLocaleString('en-US', {maximumFractionDigits:0})} lbs remaining`;
+
+  // Pallet capacity (for containers)
+  const palletInfo = document.getElementById('capacity-pallet-info');
+  if (limit.maxPallets) {
+    let totalPallets = 0;
+    orderItems.forEach(item => {
+      const upp = UNITS_PER_PALLET[item.presentation];
+      if (upp) totalPallets += Math.ceil(item.qty / upp);
+    });
+    const palletPct = ((totalPallets / limit.maxPallets) * 100).toFixed(0);
+    document.getElementById('capacity-pallet-text').textContent =
+      `Pallets: ${totalPallets} / ${limit.maxPallets} (${palletPct}%)`;
+    palletInfo.style.display = '';
+  } else {
+    palletInfo.style.display = 'none';
+  }
+
+  // Over-capacity warning
+  const warning = document.getElementById('capacity-warning');
+  const overWeight = totalWeightLbs > limit.maxLbs;
+  const overPallets = limit.maxPallets && orderItems.reduce((sum, item) => {
+    const upp = UNITS_PER_PALLET[item.presentation];
+    return sum + (upp ? Math.ceil(item.qty / upp) : 0);
+  }, 0) > limit.maxPallets;
+  warning.style.display = (overWeight || overPallets) ? '' : 'none';
+  if (overWeight && overPallets) {
+    warning.textContent = '⚠ Order exceeds weight AND pallet capacity!';
+  } else if (overWeight) {
+    warning.textContent = '⚠ Order exceeds weight capacity!';
+  } else if (overPallets) {
+    warning.textContent = '⚠ Order exceeds pallet capacity!';
   }
 }
 

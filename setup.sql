@@ -14,6 +14,7 @@ CREATE TABLE customers (
   password_hash text NOT NULL,
   is_admin boolean DEFAULT false,
   is_active boolean DEFAULT true,
+  shipping_type text DEFAULT NULL,  -- FTL, CONTAINER_40, CONTAINER_20
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
