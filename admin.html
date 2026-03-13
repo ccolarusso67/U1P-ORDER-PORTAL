@@ -542,8 +542,15 @@
     <div id="pricing-panel" style="display:none">
       <div class="section-header mt-24">
         <h3 class="section-title" style="font-size:1rem" id="pricing-customer-label">Price Overrides</h3>
-        <button class="btn btn-primary btn-sm" onclick="toggleForm('price-override-form')">+ Add Override</button>
+        <div class="flex-row gap-8">
+          <button class="btn btn-primary btn-sm" onclick="toggleForm('price-override-form')">+ Add Override</button>
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('price-csv-input').click()">Upload Prices CSV</button>
+          <input type="file" id="price-csv-input" accept=".csv" style="display:none" onchange="handlePriceUpload(this)" />
+          <a href="price_template.xlsx" download class="btn btn-outline" style="text-decoration:none;font-size:.78rem;padding:6px 16px">Download Template</a>
+        </div>
       </div>
+
+      <div id="price-upload-alert" class="alert"></div>
 
       <div class="inline-form" id="price-override-form">
         <h3>Add Price Override</h3>
@@ -1033,6 +1040,75 @@ async function deleteOverride(priceId) {
     alert('Failed to delete: ' + e.message);
   }
   hideLoading();
+}
+
+// ── Price CSV Upload ──
+async function handlePriceUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  const customerId = document.getElementById('pricing-customer-select').value;
+  if (!customerId) return showAlert('price-upload-alert', 'Please select a customer first.', 'error');
+
+  showLoading();
+  try {
+    const text = await file.text();
+    const rows = parsePriceCSV(text);
+
+    if (rows.length === 0) {
+      hideLoading();
+      return showAlert('price-upload-alert', 'No data rows found in file.', 'error');
+    }
+
+    let added = 0, skipped = 0, errors = [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r.product_code || !r.presentation || isNaN(r.price) || r.price < 0) {
+        errors.push('Row ' + (i + 2) + ': Missing or invalid data');
+        skipped++;
+        continue;
+      }
+      const result = await supaSetCustomerPrice(customerId, r.product_code, r.presentation, r.price);
+      if (result.success) {
+        added++;
+      } else {
+        errors.push('Row ' + (i + 2) + ': ' + r.product_code + ' ' + r.presentation + ' — ' + result.error);
+        skipped++;
+      }
+    }
+
+    await loadCustomerPrices();
+
+    let msg = 'Upload complete: ' + added + ' prices set';
+    if (skipped > 0) msg += ', ' + skipped + ' skipped';
+    if (errors.length > 0) msg += '. Issues: ' + errors.join('; ');
+    showAlert('price-upload-alert', msg, added > 0 ? 'success' : 'error');
+  } catch (e) {
+    showAlert('price-upload-alert', 'Upload failed: ' + e.message, 'error');
+  }
+  hideLoading();
+}
+
+function parsePriceCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z]/g, ''));
+  const colMap = {};
+  headers.forEach(function(h, i) {
+    if (h.includes('code') || h.includes('product')) colMap.product_code = i;
+    else if (h.includes('presentation') || h.includes('size') || h.includes('format')) colMap.presentation = i;
+    else if (h.includes('price') || h.includes('cost') || h.includes('amount')) colMap.price = i;
+  });
+
+  return lines.slice(1).map(function(line) {
+    var cols = parseCSVLine(line);
+    return {
+      product_code: (cols[colMap.product_code] || '').trim(),
+      presentation: (cols[colMap.presentation] || '').trim(),
+      price: parseFloat((cols[colMap.price] || '').trim())
+    };
+  }).filter(function(r) { return r.product_code && r.presentation; });
 }
 
 // ── Default Prices ──
