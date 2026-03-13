@@ -836,9 +836,21 @@ async function saveCustomer() {
       return showAlert('customer-form-alert', result.error || 'Failed to save customer.');
     }
 
+    const isNew = !editId;
+    const newCustomerId = result.customer ? result.customer.id : null;
+
     cancelCustomerForm();
     await loadCustomers();
     populatePricingCustomerDropdown();
+
+    // After adding a NEW customer, switch to Pricing tab to assign prices
+    if (isNew && newCustomerId) {
+      switchTab('pricing');
+      const sel = document.getElementById('pricing-customer-select');
+      sel.value = newCustomerId;
+      loadCustomerPrices();
+      showAlert('price-upload-alert', 'Customer created! Now upload their price list or add price overrides.', 'success');
+    }
   } catch (e) {
     showAlert('customer-form-alert', 'Error: ' + e.message);
   }
@@ -1342,6 +1354,7 @@ async function handleBulkUpload(input) {
     let msg = `Upload complete: ${added} customers added`;
     if (skipped > 0) msg += `, ${skipped} skipped`;
     if (errors.length > 0) msg += '. Issues: ' + errors.join('; ');
+    if (added > 0) msg += '. Remember to assign a price list to each new customer in the Pricing tab.';
     showAlert('bulk-upload-alert', msg, added > 0 ? 'success' : 'error');
   } catch (e) {
     showAlert('bulk-upload-alert', 'Upload failed: ' + e.message, 'error');
