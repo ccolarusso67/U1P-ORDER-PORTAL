@@ -7,9 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-  <script src="approved_customers.js"></script>
-  <script src="products_data.js"></script>
-  <script src="pricing_data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -721,36 +720,27 @@ function signOut() {
   window.location.href = 'login.html';
 }
 
-// Populate customer bar and pre-fill Step 1 on DOM ready
-document.addEventListener('DOMContentLoaded', function() {
-  if (!_session) return;
-  // Customer bar
-  document.getElementById('cust-name-display').textContent    = _session.name    || _session.email;
-  document.getElementById('cust-company-display').textContent = _session.company || '';
-  // Pre-fill Step 1
-  if (_session.name)    document.getElementById('client-name').value    = _session.name;
-  if (_session.company) document.getElementById('client-company').value = _session.company;
-  if (_session.email)   document.getElementById('client-email').value   = _session.email;
-  if (_session.phone)   document.getElementById('client-phone').value   = _session.phone;
-  if (_session.address) document.getElementById('client-address').value = _session.address;
-});
-
 // ─────────────────────────────────────────────────
-//  CONFIG — update this email address
+//  CONFIG
 // ─────────────────────────────────────────────────
 const ORDER_EMAIL = 'orders@ultra1plus.com';
 
 // ─────────────────────────────────────────────────
-//  Price lookup
-//  Customer-specific file (if loaded) defines CUSTOMER_PRICES
-//  and takes precedence over the default list.
+//  Data loaded from Supabase
+// ─────────────────────────────────────────────────
+let PRODUCTS = {};
+let DEFAULT_PRICES = {};
+let CUSTOMER_PRICES = {};
+
+// ─────────────────────────────────────────────────
+//  Price lookup (same logic, now uses DB data)
 // ─────────────────────────────────────────────────
 function lookupPrice(code, presentation) {
-  if (typeof CUSTOMER_PRICES !== 'undefined' && CUSTOMER_PRICES[code]) {
+  if (CUSTOMER_PRICES[code]) {
     const p = CUSTOMER_PRICES[code][presentation];
     if (p != null) return p;
   }
-  if (typeof DEFAULT_PRICES !== 'undefined' && DEFAULT_PRICES[code]) {
+  if (DEFAULT_PRICES[code]) {
     const p = DEFAULT_PRICES[code][presentation];
     if (p != null) return p;
   }
@@ -768,6 +758,47 @@ function fmtMoney(n) {
 let orderItems   = [];
 let selectedCode = null;
 let selectedName = null;
+let ALL_CODES    = [];
+
+// ─────────────────────────────────────────────────
+//  Initialize: load data from Supabase then setup UI
+// ─────────────────────────────────────────────────
+async function initApp() {
+  // Show loading state
+  document.body.style.opacity = '0.6';
+
+  try {
+    // Load data in parallel
+    const [products, defaultPrices, customerPrices] = await Promise.all([
+      supaGetProducts(),
+      supaGetDefaultPrices(),
+      supaGetCustomerPrices(_session.id)
+    ]);
+
+    PRODUCTS = products;
+    DEFAULT_PRICES = defaultPrices;
+    CUSTOMER_PRICES = customerPrices;
+    ALL_CODES = Object.keys(PRODUCTS).sort();
+
+    // Populate customer bar and pre-fill Step 1
+    document.getElementById('cust-name-display').textContent    = _session.name    || _session.email;
+    document.getElementById('cust-company-display').textContent = _session.company || '';
+    if (_session.name)    document.getElementById('client-name').value    = _session.name;
+    if (_session.company) document.getElementById('client-company').value = _session.company;
+    if (_session.email)   document.getElementById('client-email').value   = _session.email;
+    if (_session.phone)   document.getElementById('client-phone').value   = _session.phone;
+    if (_session.address) document.getElementById('client-address').value = _session.address;
+
+    console.log(`Loaded ${ALL_CODES.length} products, ${Object.keys(DEFAULT_PRICES).length} priced, ${Object.keys(CUSTOMER_PRICES).length} custom prices`);
+  } catch (err) {
+    console.error('Failed to load data:', err);
+    alert('Failed to load product data. Please refresh the page.');
+  }
+
+  document.body.style.opacity = '1';
+}
+
+document.addEventListener('DOMContentLoaded', initApp);
 
 // ─────────────────────────────────────────────────
 //  UL Autocomplete
@@ -777,8 +808,6 @@ const ulDropdown        = document.getElementById('ul-dropdown');
 const productNameDisp   = document.getElementById('product-name-display');
 const presSelect        = document.getElementById('presentation-select');
 const skuDisp           = document.getElementById('sku-display');
-
-const ALL_CODES = Object.keys(PRODUCTS).sort();
 
 function renderDropdown(query) {
   const q = query.toLowerCase().trim();
@@ -982,7 +1011,7 @@ function clearOrder() {
 // ─────────────────────────────────────────────────
 //  Submit via mailto
 // ─────────────────────────────────────────────────
-function submitOrder() {
+async function submitOrder() {
   const alertEl = document.getElementById('submit-alert');
   alertEl.classList.remove('show');
 
@@ -998,8 +1027,25 @@ function submitOrder() {
   if (!email)             return showAlert(alertEl, 'Please enter your email address.');
   if (orderItems.length === 0) return showAlert(alertEl, 'Please add at least one product before submitting.');
 
-  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  // Calculate grand total
+  let grandTotal = 0;
+  orderItems.forEach(item => {
+    if (item.unitPrice != null) grandTotal += item.unitPrice * item.qty;
+  });
 
+  // Save order to Supabase
+  const result = await supaSubmitOrder({
+    customer_id: _session.id,
+    name, company, email, phone, address, notes,
+    total: grandTotal > 0 ? grandTotal : null
+  }, orderItems);
+
+  if (!result.success) {
+    return showAlert(alertEl, 'Failed to save order: ' + result.error);
+  }
+
+  // Also send mailto as backup
+  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const line = '─'.repeat(60);
   let body = `ULTRA1PLUS ORDER REQUEST\n${line}\nDate: ${date}\n\n`;
   body += `CLIENT INFORMATION\n`;
@@ -1019,10 +1065,8 @@ function submitOrder() {
     body += col('#', 3) + col('UL Number', 12) + col('Presentation', 28) + col('SKU', 26) + 'Qty\n';
     body += '─'.repeat(75) + '\n';
   }
-  let grandTotal = 0;
   orderItems.forEach((item, i) => {
     const lineTotal = (item.unitPrice != null) ? item.unitPrice * item.qty : null;
-    if (lineTotal != null) grandTotal += lineTotal;
     if (hasPrice) {
       const up = item.unitPrice != null ? fmtMoney(item.unitPrice) : '—';
       const lt = lineTotal != null ? fmtMoney(lineTotal) : '—';

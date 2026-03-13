@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -333,8 +335,6 @@
 </footer>
 
 <script>
-  const REG_EMAIL = 'orders@ultra1plus.com';
-
   function showAlert(msg) {
     const el = document.getElementById('reg-alert');
     el.textContent = msg;
@@ -347,7 +347,7 @@
     el.classList.remove('show');
   }
 
-  function submitRegistration() {
+  async function submitRegistration() {
     clearAlert();
 
     const name     = document.getElementById('reg-name').value.trim();
@@ -367,37 +367,20 @@
     if (password !== confirm)
                   return showAlert('Passwords do not match.');
 
-    const date    = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const line    = '─'.repeat(48);
-    const body    = [
-      'NEW ACCOUNT ACCESS REQUEST',
-      line,
-      `Date:     ${date}`,
-      '',
-      'APPLICANT DETAILS',
-      line,
-      `Name:     ${name}`,
-      `Company:  ${company}`,
-      `Email:    ${email}`,
-      `Phone:    ${phone || '—'}`,
-      `Address:  ${address || '—'}`,
-      '',
-      'REQUESTED PASSWORD',
-      line,
-      `Password: ${password}`,
-      '',
-      line,
-      'To approve: add this customer to approved_customers.js and notify them.',
-    ].join('\n');
+    const btn = document.querySelector('.btn-submit');
+    btn.textContent = 'Submitting...';
+    btn.disabled = true;
 
-    const subject = encodeURIComponent(`Account Request — ${company} — ${date}`);
-    const bodyEnc = encodeURIComponent(body);
-    window.location.href = `mailto:${REG_EMAIL}?subject=${subject}&body=${bodyEnc}`;
+    const result = await supaRegister({ name, company, email, phone, address, password });
 
-    setTimeout(() => {
-      document.getElementById('reg-card').style.display = 'none';
-      document.getElementById('success-card').classList.add('show');
-    }, 800);
+    if (!result.success) {
+      btn.innerHTML = '&#x2192; Send Access Request';
+      btn.disabled = false;
+      return showAlert('Registration failed: ' + result.error);
+    }
+
+    document.getElementById('reg-card').style.display = 'none';
+    document.getElementById('success-card').classList.add('show');
   }
 </script>
 

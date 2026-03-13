@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "U1P Order Portal",
-      "runtimeExecutable": "C:\\Program Files\\Git\\usr\\bin\\perl.exe",
-      "runtimeArgs": ["serve.pl"],
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "3002"],
       "port": 3002
     }
   ]

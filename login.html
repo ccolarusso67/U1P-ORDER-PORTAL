@@ -7,7 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-  <script src="approved_customers.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -216,7 +217,10 @@
   // Redirect if already logged in
   (function() {
     const s = JSON.parse(localStorage.getItem('u1p_session') || 'null');
-    if (s && s.email) window.location.href = 'order_form.html';
+    if (s && s.email) {
+      if (s.is_admin) { window.location.href = 'admin.html'; }
+      else            { window.location.href = 'order_form.html'; }
+    }
   })();
 
   function showAlert(msg) {
@@ -228,7 +232,7 @@
     document.getElementById('login-alert').classList.remove('show');
   }
 
-  function doLogin() {
+  async function doLogin() {
     clearAlert();
     const email    = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value;
@@ -236,24 +240,36 @@
     if (!email)    return showAlert('Please enter your email address.');
     if (!password) return showAlert('Please enter your password.');
 
-    const customers = (typeof APPROVED_CUSTOMERS !== 'undefined') ? APPROVED_CUSTOMERS : {};
-    const record    = customers[email] || customers[Object.keys(customers).find(k => k.toLowerCase() === email)];
+    const btn = document.querySelector('.btn-signin');
+    btn.textContent = 'Signing in...';
+    btn.disabled = true;
 
-    if (!record || record.password !== password) {
-      return showAlert('Invalid email or password, or your account is pending approval.');
+    const result = await supaLogin(email, password);
+
+    if (!result.success) {
+      btn.innerHTML = 'Sign In &rarr;';
+      btn.disabled = false;
+      return showAlert(result.error);
     }
+
+    const c = result.customer;
 
     // Store session
     localStorage.setItem('u1p_session', JSON.stringify({
-      email:       email,
-      name:        record.name        || '',
-      company:     record.company     || '',
-      phone:       record.phone       || '',
-      address:     record.address     || '',
-      pricingFile: record.pricingFile || null
+      id:        c.id,
+      email:     c.email,
+      name:      c.name      || '',
+      company:   c.company   || '',
+      phone:     c.phone     || '',
+      address:   c.address   || '',
+      is_admin:  c.is_admin  || false
     }));
 
-    window.location.href = 'order_form.html';
+    if (c.is_admin) {
+      window.location.href = 'admin.html';
+    } else {
+      window.location.href = 'order_form.html';
+    }
   }
 </script>
 

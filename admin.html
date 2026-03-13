@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ultra1Plus — Admin Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black:  #000000;
+      --gold:   #FFC700;
+      --white:  #ffffff;
+      --gray-1: #f6f6f6;
+      --gray-2: #e5e5e5;
+      --gray-3: #999999;
+      --gray-4: #333333;
+      --red:    #cc2200;
+      --green:  #1a6b3c;
+      --radius: 0px;
+    }
+
+    body {
+      font-family: 'Inter', 'Rubik', sans-serif;
+      background: var(--gray-1);
+      color: var(--gray-4);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--black);
+      padding: 0 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 80px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      border-bottom: 3px solid var(--gold);
+    }
+    header .logo img {
+      height: 48px;
+      display: block;
+    }
+    header .header-right {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    header .page-title {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--white);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    header .page-title span { color: var(--gold); }
+    header .admin-name {
+      color: var(--gray-3);
+      font-size: 0.85rem;
+    }
+    header .btn-signout {
+      background: transparent;
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      font-family: 'Rubik', sans-serif;
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 8px 20px;
+      cursor: pointer;
+      clip-path: polygon(12% 0, 100% 0%, 88% 100%, 0% 100%);
+      transition: background 0.2s, color 0.2s;
+    }
+    header .btn-signout:hover {
+      background: var(--gold);
+      color: var(--black);
+    }
+
+    /* ── Tabs ── */
+    .tab-bar {
+      background: var(--white);
+      border-bottom: 1px solid var(--gray-2);
+      display: flex;
+      justify-content: center;
+      gap: 0;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      font-family: 'Rubik', sans-serif;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 16px 32px;
+      color: var(--gray-3);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .tab-btn:hover { color: var(--gray-4); }
+    .tab-btn.active {
+      color: var(--black);
+      border-bottom-color: var(--gold);
+    }
+
+    /* ── Main ── */
+    main {
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 32px 20px 80px;
+      flex: 1;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Buttons ── */
+    .btn {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 10px 28px;
+      border: none;
+      cursor: pointer;
+      clip-path: polygon(12% 0, 100% 0%, 88% 100%, 0% 100%);
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--gold); color: var(--black); }
+    .btn-danger  { background: var(--red); color: var(--white); }
+    .btn-green   { background: var(--green); color: var(--white); }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--gray-3);
+      color: var(--gray-4);
+      clip-path: none;
+      padding: 6px 16px;
+      font-size: 0.8rem;
+    }
+    .btn-sm {
+      padding: 6px 18px;
+      font-size: 0.78rem;
+    }
+
+    /* ── Tables ── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin-top: 16px;
+    }
+    .data-table thead th {
+      background: var(--black);
+      color: var(--gold);
+      font-family: 'Rubik', sans-serif;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-size: 0.78rem;
+      padding: 12px 14px;
+      text-align: left;
+      white-space: nowrap;
+    }
+    .data-table tbody td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--gray-2);
+      vertical-align: middle;
+    }
+    .data-table tbody tr:nth-child(even) { background: var(--white); }
+    .data-table tbody tr:nth-child(odd)  { background: var(--gray-1); }
+    .data-table tbody tr:hover { background: #fff9e0; }
+
+    /* ── Section ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .section-title {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 800;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--black);
+    }
+
+    /* ── Forms ── */
+    .inline-form {
+      background: var(--white);
+      border: 2px solid var(--gold);
+      padding: 24px;
+      margin: 16px 0;
+      display: none;
+    }
+    .inline-form.open { display: block; }
+    .inline-form h3 {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      color: var(--black);
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--gray-3);
+    }
+    .form-group input,
+    .form-group select {
+      padding: 10px 12px;
+      border: 1px solid var(--gray-2);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      background: var(--gray-1);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: var(--gold);
+    }
+    .form-group .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 8px;
+    }
+    .form-group .checkbox-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--gold);
+    }
+    .form-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 2px;
+    }
+    .badge-yes { background: #d4edda; color: var(--green); }
+    .badge-no  { background: #f8d7da; color: var(--red); }
+    .badge-pending   { background: #fff3cd; color: #856404; }
+    .badge-confirmed { background: #d4edda; color: var(--green); }
+    .badge-shipped   { background: #cce5ff; color: #004085; }
+    .badge-completed { background: #d4edda; color: var(--green); }
+    .badge-cancelled { background: #f8d7da; color: var(--red); }
+
+    /* ── Status select ── */
+    .status-select {
+      padding: 4px 8px;
+      font-size: 0.82rem;
+      border: 1px solid var(--gray-2);
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+    }
+
+    /* ── Alert ── */
+    .alert {
+      padding: 10px 16px;
+      font-size: 0.85rem;
+      margin: 8px 0;
+      display: none;
+    }
+    .alert.show { display: block; }
+    .alert-error { background: #f8d7da; color: var(--red); border-left: 4px solid var(--red); }
+    .alert-success { background: #d4edda; color: var(--green); border-left: 4px solid var(--green); }
+
+    /* ── Search ── */
+    .search-input {
+      padding: 10px 14px;
+      border: 1px solid var(--gray-2);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      width: 100%;
+      max-width: 400px;
+      background: var(--white);
+      outline: none;
+    }
+    .search-input:focus { border-color: var(--gold); }
+
+    /* ── Sub-table (order items) ── */
+    .sub-table-wrap {
+      padding: 8px 14px 16px;
+      background: #fafafa;
+    }
+    .sub-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    .sub-table th {
+      background: var(--gray-2);
+      padding: 8px 10px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .sub-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--gray-2);
+    }
+
+    /* ── Spacing helpers ── */
+    .mt-24 { margin-top: 24px; }
+    .mt-32 { margin-top: 32px; }
+    .mb-12 { margin-bottom: 12px; }
+    .gap-8 { gap: 8px; }
+    .flex-row { display: flex; align-items: center; }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .text-muted { color: var(--gray-3); font-size: 0.82rem; }
+
+    /* ── Loading overlay ── */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+    .loading-overlay.hidden { display: none; }
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid var(--gray-2);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Footer ── */
+    footer {
+      background: var(--black);
+      color: var(--gray-3);
+      text-align: center;
+      padding: 24px 20px;
+      font-size: 0.82rem;
+      border-top: 3px solid var(--gold);
+      margin-top: auto;
+    }
+    footer a { color: var(--gold); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    footer strong { color: var(--white); }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      header { padding: 0 16px; height: 64px; }
+      header .logo img { height: 36px; }
+      header .page-title { font-size: 0.8rem; letter-spacing: 1px; }
+      header .admin-name { display: none; }
+      .tab-btn { padding: 12px 16px; font-size: 0.8rem; letter-spacing: 1px; }
+      main { padding: 20px 12px 60px; }
+      .data-table { font-size: 0.8rem; display: block; overflow-x: auto; }
+      .form-grid { grid-template-columns: 1fr; }
+      .section-header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="order_form.html" class="logo">
+    <img src="https://cdn11.bigcommerce.com/s-w94u0bjkb6/images/stencil/original/recurso_1_1757027375__15872.original.png" alt="Ultra1Plus" />
+  </a>
+  <div class="header-right">
+    <div class="page-title"><span>Admin</span> Panel</div>
+    <span class="admin-name" id="admin-name-display"></span>
+    <button class="btn-signout" onclick="signOut()">Sign Out</button>
+  </div>
+</header>
+
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="customers" onclick="switchTab('customers')">Customers</button>
+  <button class="tab-btn" data-tab="pricing" onclick="switchTab('pricing')">Pricing</button>
+  <button class="tab-btn" data-tab="orders" onclick="switchTab('orders')">Orders</button>
+</nav>
+
+<main>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!--  TAB 1: CUSTOMERS                              -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div class="tab-content active" id="tab-customers">
+
+    <div class="section-header">
+      <h2 class="section-title">Customers</h2>
+      <button class="btn btn-primary" onclick="toggleForm('customer-form')">+ Add Customer</button>
+    </div>
+
+    <div class="inline-form" id="customer-form">
+      <h3 id="customer-form-title">Add Customer</h3>
+      <input type="hidden" id="cust-edit-id" value="" />
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" id="cust-name" placeholder="Full name" />
+        </div>
+        <div class="form-group">
+          <label>Company</label>
+          <input type="text" id="cust-company" placeholder="Company name" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="cust-email" placeholder="email@example.com" />
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" id="cust-phone" placeholder="Phone number" />
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <input type="text" id="cust-address" placeholder="Shipping address" />
+        </div>
+        <div class="form-group" id="cust-password-group">
+          <label>Password</label>
+          <input type="text" id="cust-password" placeholder="Initial password" />
+        </div>
+        <div class="form-group">
+          <label>&nbsp;</label>
+          <div class="checkbox-row">
+            <input type="checkbox" id="cust-is-admin" />
+            <label for="cust-is-admin" style="text-transform:none;font-size:0.88rem;color:var(--gray-4)">Administrator</label>
+          </div>
+        </div>
+      </div>
+      <div id="customer-form-alert" class="alert alert-error"></div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="saveCustomer()">Save Customer</button>
+        <button class="btn btn-outline" onclick="cancelCustomerForm()">Cancel</button>
+      </div>
+    </div>
+
+    <table class="data-table" id="customers-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Company</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Admin</th>
+          <th>Active</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="customers-tbody">
+        <tr><td colspan="7" class="text-center text-muted" style="padding:24px">Loading customers...</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Pending Registrations -->
+    <div class="mt-32">
+      <h2 class="section-title mb-12">Pending Registration Requests</h2>
+      <table class="data-table" id="registrations-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Company</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="registrations-tbody">
+          <tr><td colspan="6" class="text-center text-muted" style="padding:24px">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!--  TAB 2: PRICING                                -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-pricing">
+
+    <div class="section-header">
+      <h2 class="section-title">Customer Price Overrides</h2>
+    </div>
+
+    <div class="form-grid" style="margin-top:16px;max-width:500px">
+      <div class="form-group">
+        <label>Select Customer</label>
+        <select id="pricing-customer-select" onchange="loadCustomerPrices()">
+          <option value="">-- Select a customer --</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="pricing-panel" style="display:none">
+      <div class="section-header mt-24">
+        <h3 class="section-title" style="font-size:1rem" id="pricing-customer-label">Price Overrides</h3>
+        <button class="btn btn-primary btn-sm" onclick="toggleForm('price-override-form')">+ Add Override</button>
+      </div>
+
+      <div class="inline-form" id="price-override-form">
+        <h3>Add Price Override</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Product Code</label>
+            <select id="override-product-code" onchange="populateOverridePresentations()">
+              <option value="">-- Select product --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Presentation</label>
+            <select id="override-presentation" disabled>
+              <option value="">-- Select product first --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Custom Price ($)</label>
+            <input type="number" id="override-price" step="0.01" min="0" placeholder="0.00" />
+          </div>
+        </div>
+        <div id="override-form-alert" class="alert alert-error"></div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="saveOverride()">Save Override</button>
+          <button class="btn btn-outline" onclick="closeForm('price-override-form')">Cancel</button>
+        </div>
+      </div>
+
+      <table class="data-table" id="overrides-table">
+        <thead>
+          <tr>
+            <th>Product Code</th>
+            <th>Presentation</th>
+            <th>Custom Price</th>
+            <th>Default Price</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="overrides-tbody">
+          <tr><td colspan="5" class="text-center text-muted" style="padding:24px">Select a customer above</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Default Price List -->
+    <div class="mt-32">
+      <div class="section-header">
+        <h2 class="section-title">Default Price List</h2>
+      </div>
+      <div style="margin-top:12px;margin-bottom:4px">
+        <input type="text" class="search-input" id="default-price-search" placeholder="Search by product code..." oninput="renderDefaultPrices()" />
+      </div>
+      <table class="data-table" id="default-prices-table">
+        <thead>
+          <tr>
+            <th>Product Code</th>
+            <th>Presentation</th>
+            <th>Default Price</th>
+          </tr>
+        </thead>
+        <tbody id="default-prices-tbody">
+          <tr><td colspan="3" class="text-center text-muted" style="padding:24px">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!--  TAB 3: ORDERS                                 -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-orders">
+
+    <div class="section-header">
+      <h2 class="section-title">Orders</h2>
+      <button class="btn btn-primary" onclick="exportOrdersCSV()">Export CSV</button>
+    </div>
+
+    <table class="data-table" id="orders-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Order #</th>
+          <th>Customer</th>
+          <th>Company</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="orders-tbody">
+        <tr><td colspan="7" class="text-center text-muted" style="padding:24px">Loading orders...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+
+<footer>
+  &copy; 2025 <strong>Ultra1Plus</strong> &mdash; Ultrachem LLC. All rights reserved. &nbsp;|&nbsp;
+  <a href="https://ultra1plus.com" target="_blank">ultra1plus.com</a>
+</footer>
+
+<div class="loading-overlay hidden" id="loading-overlay">
+  <div class="loading-spinner"></div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────
+//  AUTH GATE
+// ─────────────────────────────────────────────────
+const _session = JSON.parse(localStorage.getItem('u1p_session') || 'null');
+if (!_session || !_session.is_admin) {
+  window.location.href = 'login.html';
+}
+
+document.getElementById('admin-name-display').textContent = _session.name || _session.email;
+
+function signOut() {
+  localStorage.removeItem('u1p_session');
+  window.location.href = 'login.html';
+}
+
+// ─────────────────────────────────────────────────
+//  Helpers
+// ─────────────────────────────────────────────────
+function fmtMoney(n) {
+  if (n == null) return '\u2014';
+  return '$' + n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function fmtDate(d) {
+  if (!d) return '\u2014';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function showLoading() { document.getElementById('loading-overlay').classList.remove('hidden'); }
+function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
+
+function showAlert(id, msg, type) {
+  const el = document.getElementById(id);
+  el.className = 'alert show ' + (type === 'success' ? 'alert-success' : 'alert-error');
+  el.textContent = msg;
+}
+function hideAlert(id) {
+  const el = document.getElementById(id);
+  el.className = 'alert alert-error';
+}
+
+function toggleForm(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+function closeForm(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// ─────────────────────────────────────────────────
+//  Tab switching
+// ─────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + tab));
+}
+
+// ─────────────────────────────────────────────────
+//  State
+// ─────────────────────────────────────────────────
+let customers = [];
+let registrations = [];
+let orders = [];
+let defaultPrices = {};
+let products = {};
+let customerOverrides = [];
+let expandedOrders = {};
+
+// ─────────────────────────────────────────────────
+//  CUSTOMERS TAB
+// ─────────────────────────────────────────────────
+async function loadCustomers() {
+  try {
+    customers = await supaGetCustomers();
+    renderCustomers();
+  } catch (e) {
+    console.error('loadCustomers:', e);
+  }
+}
+
+function renderCustomers() {
+  const tbody = document.getElementById('customers-tbody');
+  if (customers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:24px">No customers found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = customers.map(c => `
+    <tr>
+      <td>${esc(c.name || '')}</td>
+      <td>${esc(c.company || '')}</td>
+      <td>${esc(c.email || '')}</td>
+      <td>${esc(c.phone || '')}</td>
+      <td><span class="badge ${c.is_admin ? 'badge-yes' : 'badge-no'}">${c.is_admin ? 'Yes' : 'No'}</span></td>
+      <td><span class="badge ${c.is_active !== false ? 'badge-yes' : 'badge-no'}">${c.is_active !== false ? 'Yes' : 'No'}</span></td>
+      <td>
+        <div class="flex-row gap-8">
+          <button class="btn btn-outline" onclick="editCustomer('${c.id}')">Edit</button>
+          <button class="btn btn-outline" style="color:var(--red);border-color:var(--red)" onclick="deleteCustomer('${c.id}', '${esc(c.name)}')">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function cancelCustomerForm() {
+  closeForm('customer-form');
+  resetCustomerForm();
+}
+
+function resetCustomerForm() {
+  document.getElementById('cust-edit-id').value = '';
+  document.getElementById('cust-name').value = '';
+  document.getElementById('cust-company').value = '';
+  document.getElementById('cust-email').value = '';
+  document.getElementById('cust-phone').value = '';
+  document.getElementById('cust-address').value = '';
+  document.getElementById('cust-password').value = '';
+  document.getElementById('cust-is-admin').checked = false;
+  document.getElementById('customer-form-title').textContent = 'Add Customer';
+  document.getElementById('cust-password-group').style.display = '';
+  hideAlert('customer-form-alert');
+}
+
+function editCustomer(id) {
+  const c = customers.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('cust-edit-id').value = c.id;
+  document.getElementById('cust-name').value = c.name || '';
+  document.getElementById('cust-company').value = c.company || '';
+  document.getElementById('cust-email').value = c.email || '';
+  document.getElementById('cust-phone').value = c.phone || '';
+  document.getElementById('cust-address').value = c.address || '';
+  document.getElementById('cust-password').value = '';
+  document.getElementById('cust-is-admin').checked = !!c.is_admin;
+  document.getElementById('customer-form-title').textContent = 'Edit Customer';
+  document.getElementById('cust-password-group').style.display = 'none';
+  hideAlert('customer-form-alert');
+  document.getElementById('customer-form').classList.add('open');
+  document.getElementById('cust-name').focus();
+}
+
+async function saveCustomer() {
+  const editId = document.getElementById('cust-edit-id').value;
+  const data = {
+    name: document.getElementById('cust-name').value.trim(),
+    company: document.getElementById('cust-company').value.trim(),
+    email: document.getElementById('cust-email').value.trim(),
+    phone: document.getElementById('cust-phone').value.trim(),
+    address: document.getElementById('cust-address').value.trim(),
+    is_admin: document.getElementById('cust-is-admin').checked
+  };
+
+  if (!data.name) return showAlert('customer-form-alert', 'Name is required.');
+  if (!data.email) return showAlert('customer-form-alert', 'Email is required.');
+
+  showLoading();
+  try {
+    let result;
+    if (editId) {
+      result = await supaUpdateCustomer(editId, data);
+    } else {
+      data.password = document.getElementById('cust-password').value.trim();
+      if (!data.password) { hideLoading(); return showAlert('customer-form-alert', 'Password is required for new customers.'); }
+      result = await supaAddCustomer(data);
+    }
+
+    if (!result.success) {
+      hideLoading();
+      return showAlert('customer-form-alert', result.error || 'Failed to save customer.');
+    }
+
+    cancelCustomerForm();
+    await loadCustomers();
+    populatePricingCustomerDropdown();
+  } catch (e) {
+    showAlert('customer-form-alert', 'Error: ' + e.message);
+  }
+  hideLoading();
+}
+
+async function deleteCustomer(id, name) {
+  if (!confirm(`Delete customer "${name}"? This cannot be undone.`)) return;
+  showLoading();
+  try {
+    await supaDeleteCustomer(id);
+    await loadCustomers();
+    populatePricingCustomerDropdown();
+  } catch (e) {
+    alert('Failed to delete: ' + e.message);
+  }
+  hideLoading();
+}
+
+// ─────────────────────────────────────────────────
+//  REGISTRATIONS
+// ─────────────────────────────────────────────────
+async function loadRegistrations() {
+  try {
+    registrations = await supaGetRegistrations();
+    renderRegistrations();
+  } catch (e) {
+    console.error('loadRegistrations:', e);
+  }
+}
+
+function renderRegistrations() {
+  const tbody = document.getElementById('registrations-tbody');
+  if (registrations.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:24px">No pending requests</td></tr>';
+    return;
+  }
+  tbody.innerHTML = registrations.map((r, i) => `
+    <tr>
+      <td>${esc(r.name || '')}</td>
+      <td>${esc(r.company || '')}</td>
+      <td>${esc(r.email || '')}</td>
+      <td>${esc(r.phone || '')}</td>
+      <td>${fmtDate(r.created_at)}</td>
+      <td>
+        <div class="flex-row gap-8">
+          <button class="btn btn-green btn-sm" onclick="approveReg(${i})">Approve</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectReg(${i})">Reject</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function approveReg(idx) {
+  const r = registrations[idx];
+  if (!r) return;
+  if (!confirm(`Approve registration for "${r.name}" (${r.email})?`)) return;
+  showLoading();
+  try {
+    await supaApproveRegistration(r);
+    await Promise.all([loadRegistrations(), loadCustomers()]);
+    populatePricingCustomerDropdown();
+  } catch (e) {
+    alert('Approval failed: ' + e.message);
+  }
+  hideLoading();
+}
+
+async function rejectReg(idx) {
+  const r = registrations[idx];
+  if (!r) return;
+  if (!confirm(`Reject registration for "${r.name}" (${r.email})?`)) return;
+  showLoading();
+  try {
+    await supaRejectRegistration(r.id);
+    await loadRegistrations();
+  } catch (e) {
+    alert('Rejection failed: ' + e.message);
+  }
+  hideLoading();
+}
+
+// ─────────────────────────────────────────────────
+//  PRICING TAB
+// ─────────────────────────────────────────────────
+function populatePricingCustomerDropdown() {
+  const sel = document.getElementById('pricing-customer-select');
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">-- Select a customer --</option>';
+  customers.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = `${c.name || c.email}${c.company ? ' (' + c.company + ')' : ''}`;
+    sel.appendChild(opt);
+  });
+  if (currentVal) sel.value = currentVal;
+}
+
+function populateOverrideProductDropdown() {
+  const sel = document.getElementById('override-product-code');
+  sel.innerHTML = '<option value="">-- Select product --</option>';
+  Object.keys(products).sort().forEach(code => {
+    const opt = document.createElement('option');
+    opt.value = code;
+    opt.textContent = `${code} - ${products[code].name || ''}`;
+    sel.appendChild(opt);
+  });
+}
+
+function populateOverridePresentations() {
+  const code = document.getElementById('override-product-code').value;
+  const sel = document.getElementById('override-presentation');
+  sel.innerHTML = '<option value="">-- Select presentation --</option>';
+  if (!code || !products[code]) { sel.disabled = true; return; }
+  products[code].presentations.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.presentation;
+    opt.textContent = p.presentation;
+    sel.appendChild(opt);
+  });
+  sel.disabled = false;
+}
+
+async function loadCustomerPrices() {
+  const customerId = document.getElementById('pricing-customer-select').value;
+  const panel = document.getElementById('pricing-panel');
+  if (!customerId) { panel.style.display = 'none'; return; }
+
+  panel.style.display = 'block';
+  const c = customers.find(x => x.id === customerId);
+  document.getElementById('pricing-customer-label').textContent = `Price Overrides for ${c ? c.name || c.email : 'Customer'}`;
+
+  showLoading();
+  try {
+    customerOverrides = await supaGetAllCustomerPrices(customerId);
+    renderOverrides();
+  } catch (e) {
+    console.error('loadCustomerPrices:', e);
+  }
+  hideLoading();
+}
+
+function renderOverrides() {
+  const tbody = document.getElementById('overrides-tbody');
+  if (customerOverrides.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:24px">No price overrides for this customer</td></tr>';
+    return;
+  }
+  tbody.innerHTML = customerOverrides.map(o => {
+    const defPrice = (defaultPrices[o.product_code] && defaultPrices[o.product_code][o.presentation]) || null;
+    return `
+      <tr>
+        <td>${esc(o.product_code)}</td>
+        <td>${esc(o.presentation)}</td>
+        <td><strong>${fmtMoney(o.unit_price)}</strong></td>
+        <td class="text-muted">${fmtMoney(defPrice)}</td>
+        <td>
+          <button class="btn btn-outline" style="color:var(--red);border-color:var(--red)" onclick="deleteOverride('${o.id}')">Delete</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function saveOverride() {
+  const customerId = document.getElementById('pricing-customer-select').value;
+  const code = document.getElementById('override-product-code').value;
+  const pres = document.getElementById('override-presentation').value;
+  const price = parseFloat(document.getElementById('override-price').value);
+
+  if (!code) return showAlert('override-form-alert', 'Please select a product.');
+  if (!pres) return showAlert('override-form-alert', 'Please select a presentation.');
+  if (isNaN(price) || price < 0) return showAlert('override-form-alert', 'Please enter a valid price.');
+
+  showLoading();
+  try {
+    await supaSetCustomerPrice(customerId, code, pres, price);
+    closeForm('price-override-form');
+    document.getElementById('override-product-code').value = '';
+    document.getElementById('override-presentation').innerHTML = '<option value="">-- Select product first --</option>';
+    document.getElementById('override-presentation').disabled = true;
+    document.getElementById('override-price').value = '';
+    hideAlert('override-form-alert');
+    await loadCustomerPrices();
+  } catch (e) {
+    showAlert('override-form-alert', 'Error: ' + e.message);
+  }
+  hideLoading();
+}
+
+async function deleteOverride(priceId) {
+  if (!confirm('Remove this price override? The default price will be used instead.')) return;
+  showLoading();
+  try {
+    await supaDeleteCustomerPrice(priceId);
+    await loadCustomerPrices();
+  } catch (e) {
+    alert('Failed to delete: ' + e.message);
+  }
+  hideLoading();
+}
+
+// ── Default Prices ──
+function renderDefaultPrices() {
+  const tbody = document.getElementById('default-prices-tbody');
+  const search = (document.getElementById('default-price-search').value || '').toLowerCase().trim();
+  const codes = Object.keys(defaultPrices).sort();
+  let rows = [];
+
+  codes.forEach(code => {
+    if (search && !code.toLowerCase().includes(search)) return;
+    const presentations = defaultPrices[code];
+    Object.keys(presentations).forEach(pres => {
+      rows.push(`
+        <tr>
+          <td>${esc(code)}</td>
+          <td>${esc(pres)}</td>
+          <td>${fmtMoney(presentations[pres])}</td>
+        </tr>
+      `);
+    });
+  });
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted" style="padding:24px">No prices found</td></tr>';
+  } else {
+    tbody.innerHTML = rows.join('');
+  }
+}
+
+// ─────────────────────────────────────────────────
+//  ORDERS TAB
+// ─────────────────────────────────────────────────
+async function loadOrders() {
+  try {
+    orders = await supaGetOrders();
+    renderOrders();
+  } catch (e) {
+    console.error('loadOrders:', e);
+  }
+}
+
+function renderOrders() {
+  const tbody = document.getElementById('orders-tbody');
+  if (orders.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:24px">No orders found</td></tr>';
+    return;
+  }
+  let html = '';
+  orders.forEach(o => {
+    const statusClass = 'badge-' + (o.status || 'pending');
+    html += `
+      <tr>
+        <td>${fmtDate(o.created_at)}</td>
+        <td><strong>${esc(o.order_number || o.id || '')}</strong></td>
+        <td>${esc(o.customer_name || o.name || '')}</td>
+        <td>${esc(o.company || '')}</td>
+        <td>${fmtMoney(o.total)}</td>
+        <td>
+          <select class="status-select" onchange="updateOrderStatus('${o.id}', this.value)">
+            ${['pending','confirmed','shipped','completed','cancelled'].map(s =>
+              `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`
+            ).join('')}
+          </select>
+        </td>
+        <td>
+          <button class="btn btn-outline" onclick="toggleOrderItems('${o.id}', this)">${expandedOrders[o.id] ? 'Hide' : 'View'}</button>
+        </td>
+      </tr>
+      <tr id="order-items-${o.id}" style="display:${expandedOrders[o.id] ? 'table-row' : 'none'}">
+        <td colspan="7" class="sub-table-wrap">
+          <div id="order-items-content-${o.id}">Loading...</div>
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+async function toggleOrderItems(orderId, btn) {
+  const row = document.getElementById('order-items-' + orderId);
+  if (expandedOrders[orderId]) {
+    row.style.display = 'none';
+    expandedOrders[orderId] = false;
+    btn.textContent = 'View';
+    return;
+  }
+
+  expandedOrders[orderId] = true;
+  row.style.display = 'table-row';
+  btn.textContent = 'Hide';
+
+  const contentEl = document.getElementById('order-items-content-' + orderId);
+  contentEl.innerHTML = '<span class="text-muted">Loading line items...</span>';
+
+  try {
+    const items = await supaGetOrderItems(orderId);
+    if (items.length === 0) {
+      contentEl.innerHTML = '<span class="text-muted">No line items</span>';
+      return;
+    }
+    let html = `
+      <table class="sub-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Product Code</th>
+            <th>Product Name</th>
+            <th>Presentation</th>
+            <th>SKU</th>
+            <th>Qty</th>
+            <th>Unit Price</th>
+            <th>Line Total</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    items.forEach((item, i) => {
+      const lineTotal = (item.unit_price != null && item.qty != null) ? item.unit_price * item.qty : null;
+      html += `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${esc(item.product_code || item.code || '')}</td>
+          <td>${esc(item.product_name || item.name || '')}</td>
+          <td>${esc(item.presentation || '')}</td>
+          <td>${esc(item.sku || '')}</td>
+          <td>${item.qty || ''}</td>
+          <td>${fmtMoney(item.unit_price)}</td>
+          <td>${fmtMoney(lineTotal)}</td>
+        </tr>
+      `;
+    });
+    html += '</tbody></table>';
+    contentEl.innerHTML = html;
+  } catch (e) {
+    contentEl.innerHTML = '<span style="color:var(--red)">Failed to load items</span>';
+  }
+}
+
+async function updateOrderStatus(orderId, status) {
+  showLoading();
+  try {
+    await supaUpdateOrderStatus(orderId, status);
+    const o = orders.find(x => x.id === orderId);
+    if (o) o.status = status;
+  } catch (e) {
+    alert('Failed to update status: ' + e.message);
+    renderOrders();
+  }
+  hideLoading();
+}
+
+function exportOrdersCSV() {
+  if (orders.length === 0) { alert('No orders to export.'); return; }
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const headers = ['Date', 'Order #', 'Customer', 'Company', 'Email', 'Total', 'Status'];
+  const rows = orders.map(o => [
+    fmtDate(o.created_at),
+    o.order_number || o.id || '',
+    o.customer_name || o.name || '',
+    o.company || '',
+    o.email || '',
+    o.total != null ? o.total.toFixed(2) : '',
+    o.status || ''
+  ].map(esc).join(','));
+
+  const csv = [headers.map(esc).join(','), ...rows].join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `orders-export-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+}
+
+// ─────────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────────
+async function initAdmin() {
+  showLoading();
+  try {
+    const [custResult, regResult, ordResult, defPrices, prods] = await Promise.all([
+      supaGetCustomers(),
+      supaGetRegistrations(),
+      supaGetOrders(),
+      supaGetDefaultPrices(),
+      supaGetProducts()
+    ]);
+
+    customers = custResult;
+    registrations = regResult;
+    orders = ordResult;
+    defaultPrices = defPrices;
+    products = prods;
+
+    renderCustomers();
+    renderRegistrations();
+    renderOrders();
+    populatePricingCustomerDropdown();
+    populateOverrideProductDropdown();
+    renderDefaultPrices();
+
+    console.log(`Admin loaded: ${customers.length} customers, ${registrations.length} pending, ${orders.length} orders`);
+  } catch (e) {
+    console.error('initAdmin failed:', e);
+    alert('Failed to load admin data. Please refresh.');
+  }
+  hideLoading();
+}
+
+document.addEventListener('DOMContentLoaded', initAdmin);
+</script>
+</body>
+</html>
