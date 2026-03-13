@@ -583,6 +583,7 @@
         <thead>
           <tr>
             <th>Product Code</th>
+            <th>Product Name</th>
             <th>Presentation</th>
             <th>Custom Price</th>
             <th>Default Price</th>
@@ -590,7 +591,7 @@
           </tr>
         </thead>
         <tbody id="overrides-tbody">
-          <tr><td colspan="5" class="text-center text-muted" style="padding:24px">Select a customer above</td></tr>
+          <tr><td colspan="6" class="text-center text-muted" style="padding:24px">Select a customer above</td></tr>
         </tbody>
       </table>
     </div>
@@ -601,18 +602,19 @@
         <h2 class="section-title">Default Price List</h2>
       </div>
       <div style="margin-top:12px;margin-bottom:4px">
-        <input type="text" class="search-input" id="default-price-search" placeholder="Search by product code..." oninput="renderDefaultPrices()" />
+        <input type="text" class="search-input" id="default-price-search" placeholder="Search by product code or name..." oninput="renderDefaultPrices()" />
       </div>
       <table class="data-table" id="default-prices-table">
         <thead>
           <tr>
             <th>Product Code</th>
+            <th>Product Name</th>
             <th>Presentation</th>
             <th>Default Price</th>
           </tr>
         </thead>
         <tbody id="default-prices-tbody">
-          <tr><td colspan="3" class="text-center text-muted" style="padding:24px">Loading...</td></tr>
+          <tr><td colspan="4" class="text-center text-muted" style="padding:24px">Loading...</td></tr>
         </tbody>
       </table>
     </div>
@@ -997,14 +999,16 @@ async function loadCustomerPrices() {
 function renderOverrides() {
   const tbody = document.getElementById('overrides-tbody');
   if (customerOverrides.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:24px">No price overrides for this customer</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:24px">No price overrides for this customer</td></tr>';
     return;
   }
   tbody.innerHTML = customerOverrides.map(o => {
     const defPrice = (defaultPrices[o.product_code] && defaultPrices[o.product_code][o.presentation]) || null;
+    const prodName = (products[o.product_code] && products[o.product_code].name) || '';
     return `
       <tr>
         <td>${esc(o.product_code)}</td>
+        <td>${esc(prodName)}</td>
         <td>${esc(o.presentation)}</td>
         <td><strong>${fmtMoney(o.unit_price)}</strong></td>
         <td class="text-muted">${fmtMoney(defPrice)}</td>
@@ -1131,12 +1135,14 @@ function renderDefaultPrices() {
   let rows = [];
 
   codes.forEach(code => {
-    if (search && !code.toLowerCase().includes(search)) return;
+    const prodName = (products[code] && products[code].name) || '';
+    if (search && !code.toLowerCase().includes(search) && !prodName.toLowerCase().includes(search)) return;
     const presentations = defaultPrices[code];
     Object.keys(presentations).forEach(pres => {
       rows.push(`
         <tr>
           <td>${esc(code)}</td>
+          <td>${esc(prodName)}</td>
           <td>${esc(pres)}</td>
           <td>${fmtMoney(presentations[pres])}</td>
         </tr>
@@ -1145,7 +1151,7 @@ function renderDefaultPrices() {
   });
 
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted" style="padding:24px">No prices found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted" style="padding:24px">No prices found</td></tr>';
   } else {
     tbody.innerHTML = rows.join('');
   }

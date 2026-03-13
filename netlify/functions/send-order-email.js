@@ -21,6 +21,7 @@ exports.handler = async (event) => {
         <tr style="border-bottom:1px solid #e5e5e5;">
           <td style="padding:8px;text-align:center;">${i + 1}</td>
           <td style="padding:8px;">${item.code}</td>
+          <td style="padding:8px;font-size:12px;color:#666;">${item.name || ''}</td>
           <td style="padding:8px;">${item.presentation}</td>
           <td style="padding:8px;">${item.sku}</td>
           <td style="padding:8px;text-align:center;">${item.qty}</td>
@@ -55,7 +56,8 @@ exports.handler = async (event) => {
           <thead>
             <tr style="background:#000;color:#FFC700;">
               <th style="padding:10px 8px;text-align:center;width:30px;">#</th>
-              <th style="padding:10px 8px;text-align:left;">Product</th>
+              <th style="padding:10px 8px;text-align:left;">Code</th>
+              <th style="padding:10px 8px;text-align:left;">Product Name</th>
               <th style="padding:10px 8px;text-align:left;">Presentation</th>
               <th style="padding:10px 8px;text-align:left;">SKU</th>
               <th style="padding:10px 8px;text-align:center;">Qty</th>
@@ -66,7 +68,7 @@ exports.handler = async (event) => {
           <tbody>${itemRows}</tbody>
           <tfoot>
             <tr style="background:#f6f6f6;font-weight:700;">
-              <td colspan="6" style="padding:10px 8px;text-align:right;">ESTIMATED TOTAL:</td>
+              <td colspan="7" style="padding:10px 8px;text-align:right;">ESTIMATED TOTAL:</td>
               <td style="padding:10px 8px;text-align:right;">${totalDisplay}</td>
             </tr>
           </tfoot>

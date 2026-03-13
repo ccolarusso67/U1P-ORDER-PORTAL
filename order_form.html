@@ -1055,6 +1055,7 @@ async function submitOrder() {
         orderId: result.orderId,
         items: orderItems.map(item => ({
           code: item.code,
+          name: item.name,
           presentation: item.presentation,
           sku: item.sku,
           qty: item.qty,
