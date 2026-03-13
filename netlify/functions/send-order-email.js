@@ -92,7 +92,7 @@ exports.handler = async (event) => {
           ${notes ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;"><tr><td style="background:#f6f6f6;padding:10px 14px;border-left:3px solid #FFC700;font-size:13px;"><strong>Notes:</strong> ${notes}</td></tr></table>` : ''}
 
           <p style="font-size:11px;color:#999;margin:18px 0 0;">This order was placed via the Ultra1Plus Distributor Portal.</p>
-          <p style="font-size:11px;color:#999;margin:4px 0 0;">Full order details are attached as a CSV file.</p>
+          {{FOOTER_EXTRA}}
         </td></tr>
       </table>
     </td></tr>
@@ -100,32 +100,60 @@ exports.handler = async (event) => {
     <!--[if mso]></td></tr></table><![endif]-->
     </body></html>`;
 
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'Ultra1Plus Orders <orders@ultra1plus.com>',
-        to: ['orders@ultra1plus.com'],
-        subject: `New Order — ${company} — ${date}`,
-        html: html,
-        attachments: [{
-          filename: filename,
-          content: csvBase64,
-        }],
+    // Internal email — with CSV attachment
+    const internalHtml = html
+      .replace('{{FOOTER_EXTRA}}', '<p style="font-size:11px;color:#999;margin:4px 0 0;">Full order details are attached as a CSV file.</p>');
+
+    // Customer email — no CSV, with thank you message
+    const customerHtml = html
+      .replace('New Order Received', 'Order Confirmation')
+      .replace('{{FOOTER_EXTRA}}', '<p style="font-size:11px;color:#999;margin:4px 0 0;">Thank you for your order. Our team will review and confirm shortly.</p>');
+
+    // Send both emails in parallel
+    const [internalRes, customerRes] = await Promise.all([
+      fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'Ultra1Plus Orders <orders@ultra1plus.com>',
+          to: ['orders@ultra1plus.com'],
+          subject: `New Order — ${company} — ${date}`,
+          html: internalHtml,
+          attachments: [{
+            filename: filename,
+            content: csvBase64,
+          }],
+        }),
       }),
-    });
+      fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'Ultra1Plus Orders <orders@ultra1plus.com>',
+          to: [email],
+          subject: `Order Confirmation — ${company} — ${date}`,
+          html: customerHtml,
+        }),
+      }),
+    ]);
 
-    const data = await response.json();
+    const internalData = await internalRes.json();
+    const customerData = await customerRes.json();
 
-    if (!response.ok) {
-      console.error('Resend error:', data);
-      return { statusCode: response.status, body: JSON.stringify({ error: data.message || 'Failed to send email' }) };
+    if (!internalRes.ok) {
+      console.error('Internal email error:', internalData);
+    }
+    if (!customerRes.ok) {
+      console.error('Customer email error:', customerData);
     }
 
-    return { statusCode: 200, body: JSON.stringify({ success: true, id: data.id }) };
+    return { statusCode: 200, body: JSON.stringify({ success: true, internalId: internalData.id, customerId: customerData.id }) };
   } catch (err) {
     console.error('Function error:', err);
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
