@@ -19,14 +19,14 @@ exports.handler = async (event) => {
       const lineTotal = item.unitPrice != null ? `$${(item.unitPrice * item.qty).toFixed(2)}` : '—';
       itemRows += `
         <tr style="border-bottom:1px solid #e5e5e5;">
-          <td style="padding:8px;text-align:center;">${i + 1}</td>
-          <td style="padding:8px;">${item.code}</td>
-          <td style="padding:8px;font-size:12px;color:#666;">${item.name || ''}</td>
-          <td style="padding:8px;">${item.presentation}</td>
-          <td style="padding:8px;">${item.sku}</td>
-          <td style="padding:8px;text-align:center;">${item.qty}</td>
-          <td style="padding:8px;text-align:right;">${unitPrice}</td>
-          <td style="padding:8px;text-align:right;font-weight:600;">${lineTotal}</td>
+          <td style="padding:6px 4px;text-align:center;">${i + 1}</td>
+          <td style="padding:6px 4px;">${item.code}</td>
+          <td style="padding:6px 4px;font-size:11px;color:#666;word-break:break-word;">${item.name || ''}</td>
+          <td style="padding:6px 4px;">${item.presentation}</td>
+          <td style="padding:6px 4px;">${item.sku}</td>
+          <td style="padding:6px 4px;text-align:center;">${item.qty}</td>
+          <td style="padding:6px 4px;text-align:right;">${unitPrice}</td>
+          <td style="padding:6px 4px;text-align:right;font-weight:600;">${lineTotal}</td>
         </tr>`;
     });
 
@@ -52,14 +52,15 @@ exports.handler = async (event) => {
     const filename = `Order_${company.replace(/[^a-zA-Z0-9]/g, '_')}_${dateShort}.csv`;
 
     const html = `
-    <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:700px;margin:0 auto;font-family:Arial,sans-serif;">
+    <tr><td>
       <div style="background:#000;padding:20px 30px;text-align:center;">
         <img src="https://cdn11.bigcommerce.com/s-w94u0bjkb6/images/stencil/original/recurso_1_1757027375__15872.original.png" alt="Ultra1Plus" style="height:40px;" />
       </div>
       <div style="background:#FFC700;padding:12px 30px;">
         <h2 style="margin:0;font-size:18px;color:#000;">New Order Received</h2>
       </div>
-      <div style="padding:24px 30px;background:#fff;">
+      <div style="padding:24px 30px;background:#fff;overflow-x:auto;">
         <p style="margin:0 0 16px;color:#333;font-size:14px;"><strong>Date:</strong> ${date}</p>
 
         <table style="width:100%;margin-bottom:20px;font-size:14px;">
@@ -70,17 +71,27 @@ exports.handler = async (event) => {
           ${address ? `<tr><td style="padding:4px 0;color:#666;">Ship To:</td><td style="padding:4px 0;">${address}</td></tr>` : ''}
         </table>
 
-        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;table-layout:fixed;">
+          <colgroup>
+            <col style="width:24px;">
+            <col style="width:56px;">
+            <col style="width:auto;">
+            <col style="width:90px;">
+            <col style="width:80px;">
+            <col style="width:32px;">
+            <col style="width:68px;">
+            <col style="width:72px;">
+          </colgroup>
           <thead>
             <tr style="background:#000;color:#FFC700;">
-              <th style="padding:10px 8px;text-align:center;width:30px;">#</th>
-              <th style="padding:10px 8px;text-align:left;">Code</th>
-              <th style="padding:10px 8px;text-align:left;">Product Name</th>
-              <th style="padding:10px 8px;text-align:left;">Presentation</th>
-              <th style="padding:10px 8px;text-align:left;">SKU</th>
-              <th style="padding:10px 8px;text-align:center;">Qty</th>
-              <th style="padding:10px 8px;text-align:right;">Unit Price</th>
-              <th style="padding:10px 8px;text-align:right;">Line Total</th>
+              <th style="padding:8px 4px;text-align:center;">#</th>
+              <th style="padding:8px 4px;text-align:left;">Code</th>
+              <th style="padding:8px 4px;text-align:left;">Product Name</th>
+              <th style="padding:8px 4px;text-align:left;">Presentation</th>
+              <th style="padding:8px 4px;text-align:left;">SKU</th>
+              <th style="padding:8px 4px;text-align:center;">Qty</th>
+              <th style="padding:8px 4px;text-align:right;">Price</th>
+              <th style="padding:8px 4px;text-align:right;">Total</th>
             </tr>
           </thead>
           <tbody>${itemRows}</tbody>
@@ -96,7 +107,7 @@ exports.handler = async (event) => {
 
         <p style="font-size:12px;color:#999;margin-top:24px;">This order was placed via the Ultra1Plus Distributor Portal.</p>
       </div>
-    </div>`;
+    </td></tr></table>`;
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
