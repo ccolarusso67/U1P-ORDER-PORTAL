@@ -379,6 +379,17 @@
       return showAlert('Registration failed: ' + result.error);
     }
 
+    // Notify admin via email (non-blocking — don't let email failure block registration)
+    try {
+      await fetch('/.netlify/functions/send-registration-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, company, email, phone, address }),
+      });
+    } catch (emailErr) {
+      console.warn('Admin notification email failed:', emailErr);
+    }
+
     document.getElementById('reg-card').style.display = 'none';
     document.getElementById('success-card').classList.add('show');
   }

@@ -601,6 +601,9 @@
       <div class="section-header">
         <h2 class="section-title">Default Price List</h2>
       </div>
+      <p id="default-price-hint" class="text-muted" style="font-size:.82rem;margin:8px 0 0">
+        Select a customer above to set custom prices directly from this list.
+      </p>
       <div style="margin-top:12px;margin-bottom:4px">
         <input type="text" class="search-input" id="default-price-search" placeholder="Search by product code or name..." oninput="renderDefaultPrices()" />
       </div>
@@ -611,6 +614,7 @@
             <th>Product Name</th>
             <th>Presentation</th>
             <th>Default Price</th>
+            <th id="custom-price-col" style="display:none;min-width:160px">Customer Price</th>
           </tr>
         </thead>
         <tbody id="default-prices-tbody">
@@ -914,6 +918,16 @@ async function approveReg(idx) {
   showLoading();
   try {
     await supaApproveRegistration(r);
+    // Send welcome email to the customer (non-blocking)
+    try {
+      await fetch('/.netlify/functions/send-approval-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: r.name, company: r.company, email: r.email }),
+      });
+    } catch (emailErr) {
+      console.warn('Approval email failed:', emailErr);
+    }
     await Promise.all([loadRegistrations(), loadCustomers()]);
     populatePricingCustomerDropdown();
   } catch (e) {
@@ -980,16 +994,29 @@ function populateOverridePresentations() {
 async function loadCustomerPrices() {
   const customerId = document.getElementById('pricing-customer-select').value;
   const panel = document.getElementById('pricing-panel');
-  if (!customerId) { panel.style.display = 'none'; return; }
+  const customCol = document.getElementById('custom-price-col');
+  const hint = document.getElementById('default-price-hint');
+
+  if (!customerId) {
+    panel.style.display = 'none';
+    customCol.style.display = 'none';
+    hint.style.display = 'block';
+    renderDefaultPrices();
+    return;
+  }
 
   panel.style.display = 'block';
+  customCol.style.display = '';
+  hint.style.display = 'none';
   const c = customers.find(x => x.id === customerId);
   document.getElementById('pricing-customer-label').textContent = `Price Overrides for ${c ? c.name || c.email : 'Customer'}`;
+  customCol.textContent = `${c ? c.company || c.name : 'Customer'} Price`;
 
   showLoading();
   try {
     customerOverrides = await supaGetAllCustomerPrices(customerId);
     renderOverrides();
+    renderDefaultPrices();
   } catch (e) {
     console.error('loadCustomerPrices:', e);
   }
@@ -1132,29 +1159,79 @@ function renderDefaultPrices() {
   const tbody = document.getElementById('default-prices-tbody');
   const search = (document.getElementById('default-price-search').value || '').toLowerCase().trim();
   const codes = Object.keys(defaultPrices).sort();
+  const customerId = document.getElementById('pricing-customer-select').value;
+  const hasCustomer = !!customerId;
   let rows = [];
+
+  // Build lookup of existing overrides: key = "code|presentation"
+  const overrideLookup = {};
+  if (hasCustomer) {
+    customerOverrides.forEach(o => {
+      overrideLookup[o.product_code + '|' + o.presentation] = o;
+    });
+  }
 
   codes.forEach(code => {
     const prodName = (products[code] && products[code].name) || '';
     if (search && !code.toLowerCase().includes(search) && !prodName.toLowerCase().includes(search)) return;
     const presentations = defaultPrices[code];
     Object.keys(presentations).forEach(pres => {
+      let customCell = '';
+      if (hasCustomer) {
+        const key = code + '|' + pres;
+        const existing = overrideLookup[key];
+        const existingPrice = existing ? Number(existing.unit_price).toFixed(2) : '';
+        const rowId = `dp-${code}-${pres.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        customCell = `
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="color:#666">$</span>
+              <input type="number" id="${rowId}" step="0.01" min="0" value="${existingPrice}"
+                     placeholder="${Number(presentations[pres]).toFixed(2)}"
+                     style="width:90px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:13px${existing ? ';border-color:var(--gold);background:#fffbe6' : ''}" />
+              <button class="btn btn-primary btn-sm" style="padding:4px 10px;font-size:11px"
+                      onclick="saveInlineOverride('${esc(code)}','${esc(pres)}','${rowId}')">Set</button>
+              ${existing ? `<button class="btn btn-outline" style="padding:4px 8px;font-size:11px;color:var(--red);border-color:var(--red)" onclick="deleteOverride('${existing.id}')">✕</button>` : ''}
+            </div>
+          </td>`;
+      }
       rows.push(`
         <tr>
           <td>${esc(code)}</td>
           <td>${esc(prodName)}</td>
           <td>${esc(pres)}</td>
           <td>${fmtMoney(presentations[pres])}</td>
+          ${customCell}
         </tr>
       `);
     });
   });
 
+  const colSpan = hasCustomer ? 5 : 4;
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted" style="padding:24px">No prices found</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted" style="padding:24px">No prices found</td></tr>`;
   } else {
     tbody.innerHTML = rows.join('');
   }
+}
+
+async function saveInlineOverride(code, pres, inputId) {
+  const customerId = document.getElementById('pricing-customer-select').value;
+  if (!customerId) return alert('Please select a customer first.');
+  const input = document.getElementById(inputId);
+  const price = parseFloat(input.value);
+  if (isNaN(price) || price < 0) return alert('Please enter a valid price.');
+
+  showLoading();
+  try {
+    await supaSetCustomerPrice(customerId, code, pres, price);
+    customerOverrides = await supaGetAllCustomerPrices(customerId);
+    renderOverrides();
+    renderDefaultPrices();
+  } catch (e) {
+    alert('Error saving price: ' + e.message);
+  }
+  hideLoading();
 }
 
 // ─────────────────────────────────────────────────
