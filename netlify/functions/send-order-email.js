@@ -32,6 +32,24 @@ exports.handler = async (event) => {
 
     const totalDisplay = total != null ? `$${Number(total).toFixed(2)}` : 'N/A';
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const dateShort = new Date().toISOString().slice(0, 10);
+
+    // Build CSV attachment
+    let csv = 'Product Code,Product Name,Presentation,SKU,Qty,Unit Price,Line Total\n';
+    items.forEach(item => {
+      const up = item.unitPrice != null ? item.unitPrice : '';
+      const lt = item.unitPrice != null ? (item.unitPrice * item.qty).toFixed(2) : '';
+      const escapeCsv = (v) => {
+        const s = String(v || '');
+        return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      csv += `${escapeCsv(item.code)},${escapeCsv(item.name)},${escapeCsv(item.presentation)},${escapeCsv(item.sku)},${item.qty},${up},${lt}\n`;
+    });
+    if (total != null) {
+      csv += `,,,,,,${Number(total).toFixed(2)}\n`;
+    }
+    const csvBase64 = Buffer.from(csv).toString('base64');
+    const filename = `Order_${company.replace(/[^a-zA-Z0-9]/g, '_')}_${dateShort}.csv`;
 
     const html = `
     <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;">
@@ -91,6 +109,10 @@ exports.handler = async (event) => {
         to: ['orders@ultra1plus.com'],
         subject: `New Order — ${company} — ${date}`,
         html: html,
+        attachments: [{
+          filename: filename,
+          content: csvBase64,
+        }],
       }),
     });
 
