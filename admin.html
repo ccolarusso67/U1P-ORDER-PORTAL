@@ -1615,115 +1615,101 @@ async function generateDispatchNote(orderId) {
 
     const totalWeightKg = totalWeightLbs * 0.453592;
 
-    // ── Build PDF (landscape letter) ──
+    // ── Build PDF (landscape letter) — clean B&W, no color fills ──
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('landscape', 'mm', 'letter');
     const pageW = doc.internal.pageSize.getWidth();   // ~279
     const pageH = doc.internal.pageSize.getHeight();   // ~216
     const margin = 14;
+    const black = [0, 0, 0];
+    const gray = [120, 120, 120];
 
-    // ── Header band ──
-    doc.setFillColor(0, 0, 0);
-    doc.rect(0, 0, pageW, 26, 'F');
-
-    // Logo
+    // ── Header: logo left, title right ──
     if (logoBase64) {
-      try { doc.addImage(logoBase64, 'PNG', margin, 4, 38, 18); } catch (e) {}
+      try { doc.addImage(logoBase64, 'PNG', margin, 6, 38, 18); } catch (e) {}
     } else {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
-      doc.setTextColor(255, 255, 255);
-      doc.text('Ultra1Plus', margin + 4, 16);
+      doc.setTextColor(...black);
+      doc.text('Ultra1Plus', margin, 18);
     }
-
-    // Title
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
-    doc.setTextColor(255, 199, 0);
-    doc.text('DISPATCH NOTE', pageW - margin, 17, { align: 'right' });
+    doc.setTextColor(...black);
+    doc.text('DISPATCH NOTE', pageW - margin, 18, { align: 'right' });
 
-    // Gold accent line
-    doc.setFillColor(255, 199, 0);
-    doc.rect(0, 26, pageW, 2.5, 'F');
+    // Thin line under header
+    doc.setDrawColor(...black);
+    doc.setLineWidth(0.5);
+    doc.line(margin, 27, pageW - margin, 27);
 
     // ── Order info row ──
-    let y = 35;
-    doc.setFontSize(9);
+    let y = 34;
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(100, 100, 100);
+    doc.setTextColor(...gray);
     doc.text('ORDER #', margin, y);
     doc.text('DATE', margin + 65, y);
     doc.text('STATUS', margin + 140, y);
 
     y += 5;
     doc.setFontSize(11);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(...black);
     doc.setFont('helvetica', 'bold');
     const ordNum = order.order_number || order.id?.slice(0, 8) || '--';
     doc.text(String(ordNum), margin, y);
     doc.setFont('helvetica', 'normal');
     const orderDate = order.created_at ? new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '--';
     doc.text(orderDate, margin + 65, y);
-
-    // Status badge
-    const status = (order.status || 'pending').toUpperCase();
-    const statusColors = { PENDING: [255,193,7], CONFIRMED: [40,167,69], SHIPPED: [0,123,255], COMPLETED: [40,167,69], CANCELLED: [204,34,0] };
-    const sc = statusColors[status] || [150,150,150];
-    const stw = doc.getTextWidth(status) + 8;
-    doc.setFillColor(sc[0], sc[1], sc[2]);
-    doc.roundedRect(margin + 140, y - 4, stw, 6, 1, 1, 'F');
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255, 255, 255);
-    doc.text(status, margin + 144, y);
+    const status = (order.status || 'pending').charAt(0).toUpperCase() + (order.status || 'pending').slice(1);
+    doc.text(status, margin + 140, y);
 
     // ── Customer info section ──
-    y += 12;
-    doc.setFillColor(246, 246, 246);
-    doc.rect(margin, y - 4, pageW - margin * 2, 28, 'F');
-    doc.setDrawColor(229, 229, 229);
-    doc.rect(margin, y - 4, pageW - margin * 2, 28, 'S');
+    y += 10;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(margin, y - 3, pageW - margin * 2, 26, 'S');
 
-    // Left column
+    // Left column — Ship To
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(100, 100, 100);
-    doc.text('SHIP TO', margin + 6, y + 1);
+    doc.setTextColor(...gray);
+    doc.text('SHIP TO', margin + 5, y + 1);
     doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(...black);
     doc.setFont('helvetica', 'bold');
-    doc.text(order.customer_name || order.name || '', margin + 6, y + 7);
+    doc.text(order.customer_name || order.name || '', margin + 5, y + 7);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text(order.company || '', margin + 6, y + 12);
+    doc.text(order.company || '', margin + 5, y + 12);
     const addr = order.address || '';
-    if (addr) doc.text(addr, margin + 6, y + 17, { maxWidth: 100 });
+    if (addr) doc.text(addr, margin + 5, y + 17, { maxWidth: 100 });
 
-    // Middle column
+    // Middle column — Contact
     const midX = margin + 120;
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(100, 100, 100);
+    doc.setTextColor(...gray);
     doc.text('CONTACT', midX, y + 1);
     doc.setFontSize(9);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(...black);
     doc.setFont('helvetica', 'normal');
     if (order.phone) doc.text('Phone: ' + order.phone, midX, y + 7);
     if (order.email) doc.text('Email: ' + order.email, midX, y + 12);
 
-    // Right column — shipping type
+    // Right column — Shipping type
     const rightX = pageW - margin - 50;
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(100, 100, 100);
+    doc.setTextColor(...gray);
     doc.text('SHIPPING', rightX, y + 1);
     doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(...black);
     doc.setFont('helvetica', 'bold');
     doc.text(shippingLabel, rightX, y + 7);
 
     // ── Product table ──
-    y += 32;
+    y += 30;
     doc.autoTable({
       startY: y,
       head: [['#', 'Code', 'Product Name', 'Presentation', 'SKU', 'Qty', 'Pallets', 'Wt (lbs)', 'Wt (kg)']],
@@ -1731,11 +1717,13 @@ async function generateDispatchNote(orderId) {
       theme: 'grid',
       margin: { left: margin, right: margin },
       headStyles: {
-        fillColor: [0, 0, 0],
-        textColor: [255, 199, 0],
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
         fontStyle: 'bold',
         fontSize: 8,
         halign: 'center',
+        lineColor: [0, 0, 0],
+        lineWidth: 0.3,
       },
       columnStyles: {
         0: { halign: 'center', cellWidth: 10 },
@@ -1751,75 +1739,53 @@ async function generateDispatchNote(orderId) {
       styles: {
         fontSize: 8,
         cellPadding: 2.5,
-        lineColor: [229, 229, 229],
+        lineColor: [180, 180, 180],
         lineWidth: 0.2,
+        textColor: [0, 0, 0],
       },
-      alternateRowStyles: { fillColor: [250, 250, 250] },
+      alternateRowStyles: { fillColor: [255, 255, 255] },
       didDrawPage: (data) => {
-        // Re-draw header on new pages
         if (data.pageNumber > 1) {
-          doc.setFillColor(0, 0, 0);
-          doc.rect(0, 0, pageW, 14, 'F');
-          doc.setFillColor(255, 199, 0);
-          doc.rect(0, 14, pageW, 1.5, 'F');
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.setTextColor(255, 199, 0);
+          doc.setFontSize(9);
+          doc.setTextColor(...black);
           doc.text('DISPATCH NOTE (cont.)', pageW - margin, 10, { align: 'right' });
-          doc.setFontSize(8);
-          doc.setTextColor(255, 255, 255);
-          doc.text('Ultra1Plus', margin, 10);
+          doc.setDrawColor(...black);
+          doc.setLineWidth(0.3);
+          doc.line(margin, 13, pageW - margin, 13);
         }
       },
     });
 
     // ── Summary section ──
-    let sumY = doc.lastAutoTable.finalY + 6;
+    let sumY = doc.lastAutoTable.finalY + 4;
+    if (sumY + 20 > pageH) { doc.addPage(); sumY = 20; }
 
-    // Check if we need a new page for summary
-    if (sumY + 30 > pageH) {
-      doc.addPage();
-      sumY = 22;
-    }
+    doc.setDrawColor(...black);
+    doc.setLineWidth(0.5);
+    doc.line(margin, sumY, pageW - margin, sumY);
+    sumY += 6;
 
-    const boxW = (pageW - margin * 2 - 12) / 3;
-    const boxes = [
-      { label: 'TOTAL ITEMS', value: String(totalQty) },
-      { label: 'TOTAL PALLETS', value: hasPallets ? String(totalPallets) : 'N/A' },
-      { label: 'TOTAL WEIGHT', value: hasWeight ? `${totalWeightLbs.toFixed(1)} lbs  (${totalWeightKg.toFixed(1)} kg)` : 'N/A' },
-    ];
-    boxes.forEach((b, i) => {
-      const bx = margin + i * (boxW + 6);
-      doc.setFillColor(0, 0, 0);
-      doc.roundedRect(bx, sumY, boxW, 16, 1.5, 1.5, 'F');
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(150, 150, 150);
-      doc.text(b.label, bx + boxW / 2, sumY + 5.5, { align: 'center' });
-      doc.setFontSize(12);
-      doc.setTextColor(255, 199, 0);
-      doc.text(b.value, bx + boxW / 2, sumY + 12.5, { align: 'center' });
-    });
-    sumY += 22;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...black);
+    doc.text('Total Items: ' + totalQty, margin, sumY);
+    doc.text('Total Pallets: ' + (hasPallets ? totalPallets : 'N/A'), margin + 70, sumY);
+    doc.text('Total Weight: ' + (hasWeight ? `${totalWeightLbs.toFixed(1)} lbs  (${totalWeightKg.toFixed(1)} kg)` : 'N/A'), margin + 140, sumY);
+    sumY += 10;
 
     // ── Notes ──
     if (order.notes) {
-      if (sumY + 20 > pageH) { doc.addPage(); sumY = 22; }
+      if (sumY + 16 > pageH) { doc.addPage(); sumY = 20; }
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(100, 100, 100);
-      doc.text('NOTES', margin, sumY);
-      sumY += 4;
-      doc.setDrawColor(255, 199, 0);
-      doc.setLineWidth(0.6);
-      doc.line(margin, sumY, margin, sumY + 12);
-      doc.setFillColor(250, 250, 245);
-      doc.rect(margin + 1, sumY, pageW - margin * 2 - 1, 12, 'F');
+      doc.setTextColor(...gray);
+      doc.text('NOTES:', margin, sumY);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
-      doc.setTextColor(51, 51, 51);
-      doc.text(order.notes, margin + 5, sumY + 5, { maxWidth: pageW - margin * 2 - 10 });
-      sumY += 16;
+      doc.setTextColor(...black);
+      doc.text(order.notes, margin + 18, sumY, { maxWidth: pageW - margin * 2 - 20 });
+      sumY += 14;
     }
 
     // ── Footer ──
