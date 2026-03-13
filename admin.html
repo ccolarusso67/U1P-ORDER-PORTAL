@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -748,6 +750,37 @@ let defaultPrices = {};
 let products = {};
 let customerOverrides = [];
 let expandedOrders = {};
+let logoBase64 = null;
+
+// Units per pallet per presentation (from pallet data)
+const UNITS_PER_PALLET = {
+  'TOTE (265G)': 1, 'TOTE (250G)': 1, 'TOTE (330G)': 1,
+  'DRUM (55G)': 4, 'PAIL (5G)': 56, 'BOX (4G)': 60,
+  'BOX (6G)': 36, 'BOX (3/5QTS)': 60, 'BOX (12Q)': 84,
+  'BOX (2G)': 60, 'BOX (3Q)': 84, 'BOX (6Q)': 84,
+  'BOX (1 X 2.5G)': 92, 'BOX (2 X 2.5G)': 44,
+  'JERRYCAN (20L)': 48, 'GAL': 60, 'QUART': 84,
+  'JUG': 60, '2X5 QTS JUG': 60, 'KEG (120LBS)': 4,
+  '14OZ GREASE CARTRIDGE': 100, 'CASE 10/1': 84,
+  '5 Pack QT (Gal + QT)': 60, '6 Pack QT (Gal + 2QT)': 60,
+};
+const SHIPPING_LABELS = { FTL: 'Full Truck Load', CONTAINER_40: "40' Container", CONTAINER_20: "20' Container" };
+
+function loadLogoBase64() {
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    try {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0);
+      logoBase64 = c.toDataURL('image/png');
+    } catch (e) { console.warn('Logo base64 failed (CORS):', e); }
+  };
+  img.onerror = () => console.warn('Logo load failed');
+  img.src = 'https://cdn11.bigcommerce.com/s-w94u0bjkb6/images/stencil/original/recurso_1_1757027375__15872.original.png';
+}
 
 // ─────────────────────────────────────────────────
 //  CUSTOMERS TAB
@@ -1431,6 +1464,7 @@ function renderOrders() {
         </td>
         <td>
           <button class="btn btn-outline" onclick="toggleOrderItems('${o.id}', this)">${expandedOrders[o.id] ? 'Hide' : 'View'}</button>
+          <button class="btn btn-outline" onclick="generateDispatchNote('${o.id}')" style="margin-left:6px;" title="Download Dispatch Note">&#x1F4CB; Dispatch</button>
         </td>
       </tr>
       <tr id="order-items-${o.id}" style="display:${expandedOrders[o.id] ? 'table-row' : 'none'}">
@@ -1535,6 +1569,281 @@ function exportOrdersCSV() {
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
   a.download = `orders-export-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
+}
+
+// ─────────────────────────────────────────────────
+//  DISPATCH NOTE PDF
+// ─────────────────────────────────────────────────
+async function generateDispatchNote(orderId) {
+  const order = orders.find(o => o.id === orderId);
+  if (!order) { alert('Order not found.'); return; }
+
+  showLoading();
+  try {
+    const items = await supaGetOrderItems(orderId);
+    const customer = customers.find(c => c.id === order.customer_id);
+    const shippingType = customer ? customer.shipping_type : null;
+    const shippingLabel = shippingType ? (SHIPPING_LABELS[shippingType] || shippingType) : 'N/A';
+
+    // ── Calculate per-item pallets & weight ──
+    let totalQty = 0, totalPallets = 0, totalWeightLbs = 0;
+    let hasWeight = false, hasPallets = false;
+    const tableData = items.map((item, i) => {
+      const qty = item.qty || 0;
+      totalQty += qty;
+
+      const upp = UNITS_PER_PALLET[item.presentation];
+      const pallets = upp ? Math.ceil(qty / upp) : null;
+      if (pallets != null) { totalPallets += pallets; hasPallets = true; }
+
+      const lineWeightLbs = item.weight_lbs != null ? item.weight_lbs * qty : null;
+      const lineWeightKg = lineWeightLbs != null ? lineWeightLbs * 0.453592 : null;
+      if (lineWeightLbs != null) { totalWeightLbs += lineWeightLbs; hasWeight = true; }
+
+      return [
+        i + 1,
+        item.product_code || '',
+        item.product_name || '',
+        item.presentation || '',
+        item.sku || '',
+        qty,
+        pallets != null ? pallets : '--',
+        lineWeightLbs != null ? lineWeightLbs.toFixed(1) : '--',
+        lineWeightKg != null ? lineWeightKg.toFixed(1) : '--',
+      ];
+    });
+
+    const totalWeightKg = totalWeightLbs * 0.453592;
+
+    // ── Build PDF (landscape letter) ──
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape', 'mm', 'letter');
+    const pageW = doc.internal.pageSize.getWidth();   // ~279
+    const pageH = doc.internal.pageSize.getHeight();   // ~216
+    const margin = 14;
+
+    // ── Header band ──
+    doc.setFillColor(0, 0, 0);
+    doc.rect(0, 0, pageW, 26, 'F');
+
+    // Logo
+    if (logoBase64) {
+      try { doc.addImage(logoBase64, 'PNG', margin, 4, 38, 18); } catch (e) {}
+    } else {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(255, 255, 255);
+      doc.text('Ultra1Plus', margin + 4, 16);
+    }
+
+    // Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(255, 199, 0);
+    doc.text('DISPATCH NOTE', pageW - margin, 17, { align: 'right' });
+
+    // Gold accent line
+    doc.setFillColor(255, 199, 0);
+    doc.rect(0, 26, pageW, 2.5, 'F');
+
+    // ── Order info row ──
+    let y = 35;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(100, 100, 100);
+    doc.text('ORDER #', margin, y);
+    doc.text('DATE', margin + 65, y);
+    doc.text('STATUS', margin + 140, y);
+
+    y += 5;
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    const ordNum = order.order_number || order.id?.slice(0, 8) || '--';
+    doc.text(String(ordNum), margin, y);
+    doc.setFont('helvetica', 'normal');
+    const orderDate = order.created_at ? new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '--';
+    doc.text(orderDate, margin + 65, y);
+
+    // Status badge
+    const status = (order.status || 'pending').toUpperCase();
+    const statusColors = { PENDING: [255,193,7], CONFIRMED: [40,167,69], SHIPPED: [0,123,255], COMPLETED: [40,167,69], CANCELLED: [204,34,0] };
+    const sc = statusColors[status] || [150,150,150];
+    const stw = doc.getTextWidth(status) + 8;
+    doc.setFillColor(sc[0], sc[1], sc[2]);
+    doc.roundedRect(margin + 140, y - 4, stw, 6, 1, 1, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text(status, margin + 144, y);
+
+    // ── Customer info section ──
+    y += 12;
+    doc.setFillColor(246, 246, 246);
+    doc.rect(margin, y - 4, pageW - margin * 2, 28, 'F');
+    doc.setDrawColor(229, 229, 229);
+    doc.rect(margin, y - 4, pageW - margin * 2, 28, 'S');
+
+    // Left column
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(100, 100, 100);
+    doc.text('SHIP TO', margin + 6, y + 1);
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.text(order.customer_name || order.name || '', margin + 6, y + 7);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(order.company || '', margin + 6, y + 12);
+    const addr = order.address || '';
+    if (addr) doc.text(addr, margin + 6, y + 17, { maxWidth: 100 });
+
+    // Middle column
+    const midX = margin + 120;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(100, 100, 100);
+    doc.text('CONTACT', midX, y + 1);
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    if (order.phone) doc.text('Phone: ' + order.phone, midX, y + 7);
+    if (order.email) doc.text('Email: ' + order.email, midX, y + 12);
+
+    // Right column — shipping type
+    const rightX = pageW - margin - 50;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(100, 100, 100);
+    doc.text('SHIPPING', rightX, y + 1);
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.text(shippingLabel, rightX, y + 7);
+
+    // ── Product table ──
+    y += 32;
+    doc.autoTable({
+      startY: y,
+      head: [['#', 'Code', 'Product Name', 'Presentation', 'SKU', 'Qty', 'Pallets', 'Wt (lbs)', 'Wt (kg)']],
+      body: tableData,
+      theme: 'grid',
+      margin: { left: margin, right: margin },
+      headStyles: {
+        fillColor: [0, 0, 0],
+        textColor: [255, 199, 0],
+        fontStyle: 'bold',
+        fontSize: 8,
+        halign: 'center',
+      },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 10 },
+        1: { cellWidth: 24 },
+        2: { cellWidth: 52 },
+        3: { cellWidth: 38 },
+        4: { cellWidth: 38 },
+        5: { halign: 'center', cellWidth: 14 },
+        6: { halign: 'center', cellWidth: 18 },
+        7: { halign: 'right', cellWidth: 22 },
+        8: { halign: 'right', cellWidth: 22 },
+      },
+      styles: {
+        fontSize: 8,
+        cellPadding: 2.5,
+        lineColor: [229, 229, 229],
+        lineWidth: 0.2,
+      },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      didDrawPage: (data) => {
+        // Re-draw header on new pages
+        if (data.pageNumber > 1) {
+          doc.setFillColor(0, 0, 0);
+          doc.rect(0, 0, pageW, 14, 'F');
+          doc.setFillColor(255, 199, 0);
+          doc.rect(0, 14, pageW, 1.5, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(255, 199, 0);
+          doc.text('DISPATCH NOTE (cont.)', pageW - margin, 10, { align: 'right' });
+          doc.setFontSize(8);
+          doc.setTextColor(255, 255, 255);
+          doc.text('Ultra1Plus', margin, 10);
+        }
+      },
+    });
+
+    // ── Summary section ──
+    let sumY = doc.lastAutoTable.finalY + 6;
+
+    // Check if we need a new page for summary
+    if (sumY + 30 > pageH) {
+      doc.addPage();
+      sumY = 22;
+    }
+
+    const boxW = (pageW - margin * 2 - 12) / 3;
+    const boxes = [
+      { label: 'TOTAL ITEMS', value: String(totalQty) },
+      { label: 'TOTAL PALLETS', value: hasPallets ? String(totalPallets) : 'N/A' },
+      { label: 'TOTAL WEIGHT', value: hasWeight ? `${totalWeightLbs.toFixed(1)} lbs  (${totalWeightKg.toFixed(1)} kg)` : 'N/A' },
+    ];
+    boxes.forEach((b, i) => {
+      const bx = margin + i * (boxW + 6);
+      doc.setFillColor(0, 0, 0);
+      doc.roundedRect(bx, sumY, boxW, 16, 1.5, 1.5, 'F');
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(150, 150, 150);
+      doc.text(b.label, bx + boxW / 2, sumY + 5.5, { align: 'center' });
+      doc.setFontSize(12);
+      doc.setTextColor(255, 199, 0);
+      doc.text(b.value, bx + boxW / 2, sumY + 12.5, { align: 'center' });
+    });
+    sumY += 22;
+
+    // ── Notes ──
+    if (order.notes) {
+      if (sumY + 20 > pageH) { doc.addPage(); sumY = 22; }
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 100, 100);
+      doc.text('NOTES', margin, sumY);
+      sumY += 4;
+      doc.setDrawColor(255, 199, 0);
+      doc.setLineWidth(0.6);
+      doc.line(margin, sumY, margin, sumY + 12);
+      doc.setFillColor(250, 250, 245);
+      doc.rect(margin + 1, sumY, pageW - margin * 2 - 1, 12, 'F');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(51, 51, 51);
+      doc.text(order.notes, margin + 5, sumY + 5, { maxWidth: pageW - margin * 2 - 10 });
+      sumY += 16;
+    }
+
+    // ── Footer ──
+    const pages = doc.internal.getNumberOfPages();
+    for (let p = 1; p <= pages; p++) {
+      doc.setPage(p);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(170, 170, 170);
+      const ts = new Date().toLocaleString('en-US');
+      doc.text(`Generated from Ultra1Plus Distributor Portal — ${ts}`, pageW / 2, pageH - 6, { align: 'center' });
+      doc.text(`Page ${p} of ${pages}`, pageW - margin, pageH - 6, { align: 'right' });
+    }
+
+    // ── Save ──
+    const companySlug = (order.company || 'Order').replace(/[^a-zA-Z0-9]/g, '_');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    doc.save(`Dispatch_${companySlug}_${dateStr}.pdf`);
+
+  } catch (err) {
+    console.error('Dispatch note error:', err);
+    alert('Failed to generate dispatch note: ' + err.message);
+  }
+  hideLoading();
 }
 
 // ─────────────────────────────────────────────────
@@ -1655,6 +1964,7 @@ function parseCSVLine(line) {
 //  INIT
 // ─────────────────────────────────────────────────
 async function initAdmin() {
+  loadLogoBase64();
   showLoading();
   try {
     const [custResult, regResult, ordResult, defPrices, prods] = await Promise.all([
