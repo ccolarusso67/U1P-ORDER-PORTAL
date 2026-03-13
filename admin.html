@@ -390,6 +390,23 @@
     footer a:hover { text-decoration: underline; }
     footer strong { color: var(--white); }
 
+    /* ── Container Loading Diagram ── */
+    .container-diagram { background:#fff; border-top:3px solid var(--gold); padding:14px 18px; margin-top:12px; }
+    .container-diagram-title { font-family:'Rubik',sans-serif; font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:1px; color:var(--gray-4); margin-bottom:8px; }
+    .container-outline { border:3px solid var(--gray-4); border-radius:8px 8px 4px 4px; padding:6px; position:relative; background:#fafafa; }
+    .container-outline::before { content:''; position:absolute; top:-8px; left:50%; transform:translateX(-50%); width:40px; height:5px; background:var(--gray-4); border-radius:2px; }
+    .pallet-grid { display:grid; grid-template-columns:1fr 1fr; gap:3px; }
+    .pallet-slot { height:34px; border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:.6rem; font-family:'Rubik',sans-serif; font-weight:600; overflow:hidden; }
+    .pallet-slot.empty { border:2px dashed #d0d0d0; }
+    .pallet-slot.filled { color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.3); }
+    .pallet-slot.over { background:var(--red)!important; border:2px solid #990000; }
+    .pallet-slot .pallet-code { font-size:.65rem; font-weight:700; }
+    .pallet-slot .pallet-pres { font-size:.5rem; font-weight:500; opacity:.85; }
+    .container-legend { display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:8px; font-size:.7rem; color:var(--gray-4); }
+    .legend-item { display:flex; align-items:center; gap:4px; }
+    .legend-swatch { width:11px; height:11px; border-radius:3px; flex-shrink:0; }
+    .container-stats { display:flex; justify-content:space-between; margin-top:8px; font-size:.75rem; color:#999; }
+
     /* ── Responsive ── */
     @media (max-width: 768px) {
       header { padding: 0 16px; height: 64px; }
@@ -765,6 +782,78 @@ const UNITS_PER_PALLET = {
   '5 Pack QT (Gal + QT)': 60, '6 Pack QT (Gal + 2QT)': 60,
 };
 const SHIPPING_LABELS = { FTL: 'Full Truck Load', CONTAINER_40: "40' Container", CONTAINER_20: "20' Container" };
+
+const PALLET_COLORS = {
+  'TOTE': '#3498DB', 'DRUM': '#E67E22', 'PAIL': '#27AE60',
+  'BOX': '#9B59B6', 'JERRYCAN': '#1ABC9C', 'KEG': '#E74C3C',
+  'GAL': '#F39C12', 'QUART': '#2ECC71', 'JUG': '#D4AC0D',
+  'CASE': '#8E44AD', 'CARTRIDGE': '#95A5A6', 'BULK': '#7F8C8D',
+};
+
+function getPalletColor(presentation) {
+  const p = (presentation || '').toUpperCase();
+  for (const [key, color] of Object.entries(PALLET_COLORS)) {
+    if (p.startsWith(key) || p.includes(key)) return color;
+  }
+  return '#555555';
+}
+
+function buildContainerDiagramHTML(items, shippingType) {
+  if (!shippingType || !items || items.length === 0) return '';
+  const limits = { FTL: { maxPallets: null, label: 'TRUCK LOADING' }, CONTAINER_40: { maxPallets: 20, label: 'CONTAINER LOADING' }, CONTAINER_20: { maxPallets: 10, label: 'CONTAINER LOADING' } };
+  const cfg = limits[shippingType];
+  if (!cfg) return '';
+  const maxSlots = cfg.maxPallets || 22;
+
+  const filledSlots = [];
+  const legendMap = {};
+  let totalPallets = 0;
+
+  items.forEach(item => {
+    const upp = UNITS_PER_PALLET[item.presentation];
+    if (!upp) return;
+    const pallets = Math.ceil((item.qty || 0) / upp);
+    totalPallets += pallets;
+    const color = getPalletColor(item.presentation);
+    const presShort = (item.presentation || '').replace(/\s*\(.*\)/, '');
+    legendMap[item.presentation] = color;
+    for (let p = 0; p < pallets; p++) {
+      filledSlots.push({ code: item.product_code || '', pres: presShort, color, over: false });
+    }
+  });
+
+  if (cfg.maxPallets && filledSlots.length > maxSlots) {
+    for (let i = maxSlots; i < filledSlots.length; i++) filledSlots[i].over = true;
+  }
+
+  const displaySlots = Math.max(filledSlots.length, maxSlots);
+  let gridHTML = '';
+  for (let i = 0; i < displaySlots; i++) {
+    if (i < filledSlots.length) {
+      const s = filledSlots[i];
+      const cls = s.over ? 'pallet-slot filled over' : 'pallet-slot filled';
+      gridHTML += `<div class="${cls}" style="background:${s.over ? '' : s.color};" title="${s.code} — ${s.pres}"><span class="pallet-code">${s.code}</span><span class="pallet-pres">${s.pres}</span></div>`;
+    } else {
+      gridHTML += `<div class="pallet-slot empty"></div>`;
+    }
+  }
+
+  const statsHTML = cfg.maxPallets
+    ? `<span>${totalPallets} / ${maxSlots} pallets used</span><span>${Math.max(maxSlots - totalPallets, 0)} slots available</span>`
+    : `<span>${totalPallets} pallets</span><span>No pallet limit (weight only)</span>`;
+
+  let legendHTML = '';
+  for (const [pres, color] of Object.entries(legendMap)) {
+    legendHTML += `<div class="legend-item"><div class="legend-swatch" style="background:${color}"></div>${pres}</div>`;
+  }
+
+  return `<div class="container-diagram">
+    <div class="container-diagram-title">${cfg.label} — ${SHIPPING_LABELS[shippingType] || shippingType}</div>
+    <div class="container-outline"><div class="pallet-grid">${gridHTML}</div></div>
+    <div class="container-stats">${statsHTML}</div>
+    <div class="container-legend">${legendHTML}</div>
+  </div>`;
+}
 
 function loadLogoBase64() {
   const img = new Image();
@@ -1531,6 +1620,13 @@ async function toggleOrderItems(orderId, btn) {
       `;
     });
     html += '</tbody></table>';
+
+    // Add container loading diagram
+    const order = orders.find(o => o.id === orderId);
+    const customer = order ? customers.find(c => c.id === order.customer_id) : null;
+    const st = customer ? customer.shipping_type : null;
+    html += buildContainerDiagramHTML(items, st);
+
     contentEl.innerHTML = html;
   } catch (e) {
     contentEl.innerHTML = '<span style="color:var(--red)">Failed to load items</span>';

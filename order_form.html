@@ -502,6 +502,107 @@
     footer a { color: var(--gold); text-decoration: none; }
     footer strong { color: var(--white); }
 
+    /* ── Container Loading Diagram ── */
+    .container-diagram {
+      background: #fff;
+      border-top: 3px solid var(--gold);
+      padding: 16px 20px;
+      margin-top: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .container-diagram-title {
+      font-family: 'Rubik', sans-serif;
+      font-weight: 700;
+      font-size: .82rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--gray-4);
+      margin-bottom: 10px;
+    }
+    .container-outline {
+      border: 3px solid var(--gray-4);
+      border-radius: 8px 8px 4px 4px;
+      padding: 8px;
+      position: relative;
+      background: #fafafa;
+    }
+    .container-outline::before {
+      content: '';
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 5px;
+      background: var(--gray-4);
+      border-radius: 2px;
+    }
+    .pallet-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+    .pallet-slot {
+      height: 38px;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: .65rem;
+      font-family: 'Rubik', sans-serif;
+      font-weight: 600;
+      letter-spacing: .5px;
+      transition: all .2s;
+      overflow: hidden;
+    }
+    .pallet-slot.empty {
+      border: 2px dashed #d0d0d0;
+      background: transparent;
+    }
+    .pallet-slot.filled {
+      color: #fff;
+      text-shadow: 0 1px 2px rgba(0,0,0,.3);
+    }
+    .pallet-slot.over {
+      background: var(--red) !important;
+      border: 2px solid #990000;
+      animation: pulse-red .8s infinite alternate;
+    }
+    @keyframes pulse-red {
+      from { opacity: .85; }
+      to { opacity: 1; }
+    }
+    .pallet-slot .pallet-code { font-size: .7rem; font-weight: 700; }
+    .pallet-slot .pallet-pres { font-size: .55rem; font-weight: 500; opacity: .85; }
+    .container-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin-top: 10px;
+      font-size: .72rem;
+      color: var(--gray-4);
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .legend-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .container-stats {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+      font-size: .78rem;
+      color: var(--gray-3);
+      font-family: 'Inter', sans-serif;
+    }
+
     /* ── Responsive ── */
     @media (max-width: 720px) {
       header { padding: 0 16px; }
@@ -688,6 +789,16 @@
       <div id="capacity-warning" style="display:none;margin-top:8px;padding:8px 12px;background:#fff5f5;border-left:3px solid var(--red);font-size:.82rem;color:var(--red);font-weight:600;">
         ⚠ Order exceeds shipping capacity!
       </div>
+    </div>
+
+    <!-- Container Loading Diagram -->
+    <div id="container-diagram" class="container-diagram" style="display:none;">
+      <div class="container-diagram-title" id="container-diagram-title">CONTAINER LOADING</div>
+      <div class="container-outline">
+        <div class="pallet-grid" id="pallet-grid"></div>
+      </div>
+      <div class="container-stats" id="container-stats"></div>
+      <div class="container-legend" id="container-legend"></div>
     </div>
   </div>
 
@@ -1065,8 +1176,9 @@ function renderTable() {
     }
   }
 
-  // Update capacity meter
+  // Update capacity meter & container diagram
   updateCapacityMeter(totalWeightLbs, hasAnyWeight);
+  updateContainerDiagram();
 }
 
 function updateCapacityMeter(totalWeightLbs, hasAnyWeight) {
@@ -1126,6 +1238,94 @@ function updateCapacityMeter(totalWeightLbs, hasAnyWeight) {
   } else if (overPallets) {
     warning.textContent = '⚠ Order exceeds pallet capacity!';
   }
+}
+
+// ── Container Loading Diagram ──
+const PALLET_COLORS = {
+  'TOTE': '#3498DB', 'DRUM': '#E67E22', 'PAIL': '#27AE60',
+  'BOX': '#9B59B6', 'JERRYCAN': '#1ABC9C', 'KEG': '#E74C3C',
+  'GAL': '#F39C12', 'QUART': '#2ECC71', 'JUG': '#D4AC0D',
+  'CASE': '#8E44AD', 'CARTRIDGE': '#95A5A6', 'BULK': '#7F8C8D',
+};
+
+function getPalletColor(presentation) {
+  const p = (presentation || '').toUpperCase();
+  for (const [key, color] of Object.entries(PALLET_COLORS)) {
+    if (p.startsWith(key) || p.includes(key)) return color;
+  }
+  return '#555555';
+}
+
+function updateContainerDiagram() {
+  const diagram = document.getElementById('container-diagram');
+  const shippingType = _session.shipping_type;
+  if (!shippingType || !SHIPPING_LIMITS[shippingType] || orderItems.length === 0) {
+    diagram.style.display = 'none';
+    return;
+  }
+
+  const limit = SHIPPING_LIMITS[shippingType];
+  // Grid size: containers use maxPallets, FTL uses 22 visual slots
+  const maxSlots = limit.maxPallets || 22;
+  const title = shippingType === 'FTL' ? 'TRUCK LOADING' : 'CONTAINER LOADING';
+  document.getElementById('container-diagram-title').textContent = title;
+
+  // Build filled pallet slots grouped by item
+  const filledSlots = [];
+  const legendMap = {};
+  let totalPallets = 0;
+
+  orderItems.forEach(item => {
+    const upp = UNITS_PER_PALLET[item.presentation];
+    if (!upp) return;
+    const pallets = Math.ceil(item.qty / upp);
+    totalPallets += pallets;
+    const color = getPalletColor(item.presentation);
+    const presShort = (item.presentation || '').replace(/\s*\(.*\)/, '');
+    legendMap[item.presentation] = color;
+    for (let p = 0; p < pallets; p++) {
+      filledSlots.push({ code: item.code, pres: presShort, color, over: false });
+    }
+  });
+
+  // Mark over-capacity slots
+  if (limit.maxPallets && filledSlots.length > maxSlots) {
+    for (let i = maxSlots; i < filledSlots.length; i++) {
+      filledSlots[i].over = true;
+    }
+  }
+
+  // Build grid HTML
+  const displaySlots = Math.max(filledSlots.length, maxSlots);
+  let gridHTML = '';
+  for (let i = 0; i < displaySlots; i++) {
+    if (i < filledSlots.length) {
+      const s = filledSlots[i];
+      const cls = s.over ? 'pallet-slot filled over' : 'pallet-slot filled';
+      gridHTML += `<div class="${cls}" style="background:${s.over ? '' : s.color};" title="${s.code} — ${s.pres}">
+        <span class="pallet-code">${s.code}</span>
+        <span class="pallet-pres">${s.pres}</span>
+      </div>`;
+    } else {
+      gridHTML += `<div class="pallet-slot empty"></div>`;
+    }
+  }
+  document.getElementById('pallet-grid').innerHTML = gridHTML;
+
+  // Stats
+  const statsHTML = limit.maxPallets
+    ? `<span>${totalPallets} / ${maxSlots} pallets used</span><span>${Math.max(maxSlots - totalPallets, 0)} slots available</span>`
+    : `<span>${totalPallets} pallets</span><span>No pallet limit (weight only)</span>`;
+  document.getElementById('container-stats').innerHTML = statsHTML;
+
+  // Legend
+  let legendHTML = '';
+  for (const [pres, color] of Object.entries(legendMap)) {
+    legendHTML += `<div class="legend-item"><div class="legend-swatch" style="background:${color}"></div>${pres}</div>`;
+  }
+  document.getElementById('container-legend').innerHTML = legendHTML;
+
+  diagram.style.display = '';
 }
 
 function removeItem(idx) {
