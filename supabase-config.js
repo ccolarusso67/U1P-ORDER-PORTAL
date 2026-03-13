@@ -165,7 +165,7 @@ async function supaSubmitOrder(orderData, items) {
 
   if (liErr) { console.error('Failed to insert order items:', liErr); return { success: false, error: liErr.message }; }
 
-  return { success: true, orderId: order.id };
+  return { success: true, orderId: order.id, dispatchNumber: order.dispatch_number };
 }
 
 // ─────────────────────────────────────────────────

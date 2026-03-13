@@ -1405,6 +1405,7 @@ async function submitOrder() {
         name, company, email, phone, address, notes,
         total: grandTotal > 0 ? grandTotal : null,
         orderId: result.orderId,
+        dispatchNumber: result.dispatchNumber,
         items: orderItems.map(item => ({
           code: item.code,
           name: item.name,
@@ -1429,6 +1430,7 @@ async function submitOrder() {
         name, company, email, phone, address, notes,
         total: grandTotal > 0 ? grandTotal : null,
         orderId: result.orderId,
+        dispatchNumber: result.dispatchNumber,
         items: orderItems.map(item => ({
           code: item.code,
           name: item.name,

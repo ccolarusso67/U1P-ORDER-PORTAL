@@ -74,8 +74,11 @@ CREATE TABLE registration_requests (
 );
 
 -- 7. Orders
+CREATE SEQUENCE dispatch_number_seq START WITH 3101;
+
 CREATE TABLE orders (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  dispatch_number integer UNIQUE DEFAULT nextval('dispatch_number_seq'),
   customer_id uuid REFERENCES customers(id),
   customer_name text,
   company text,

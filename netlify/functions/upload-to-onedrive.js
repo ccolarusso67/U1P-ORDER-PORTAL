@@ -17,7 +17,7 @@ exports.handler = async (event) => {
 
   try {
     const order = JSON.parse(event.body);
-    const { name, company, email, phone, address, notes, items, total, orderId } = order;
+    const { name, company, email, phone, address, notes, items, total, orderId, dispatchNumber } = order;
 
     // ── 1. Get Microsoft Graph access token ──
     const tokenRes = await fetch(`https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`, {
@@ -63,7 +63,8 @@ exports.handler = async (event) => {
 
     // ── 3. Upload CSV ──
     const companySlug = (company || 'Order').replace(/[^a-zA-Z0-9]/g, '_');
-    const csvFilename = `Order_${companySlug}_${dateShort}.csv`;
+    const dispPrefix = dispatchNumber ? `${dispatchNumber}_` : '';
+    const csvFilename = `Order_${dispPrefix}${companySlug}_${dateShort}.csv`;
     const csvBuffer = Buffer.from(csv, 'utf-8');
 
     const csvUploadRes = await fetch(
@@ -88,6 +89,7 @@ exports.handler = async (event) => {
     dispatch += `DISPATCH NOTE\n`;
     dispatch += `${'='.repeat(60)}\n`;
     dispatch += `Date: ${date}\n`;
+    dispatch += `Dispatch #: ${dispatchNumber || 'N/A'}\n`;
     dispatch += `Order ID: ${orderId || 'N/A'}\n\n`;
     dispatch += `CUSTOMER\n`;
     dispatch += `${'-'.repeat(40)}\n`;
@@ -116,7 +118,7 @@ exports.handler = async (event) => {
     dispatch += `Generated from Ultra1Plus Distributor Portal\n`;
 
     // ── 5. Upload dispatch note TXT ──
-    const dispatchFilename = `Dispatch_${companySlug}_${dateShort}.txt`;
+    const dispatchFilename = `Dispatch_${dispPrefix}${companySlug}_${dateShort}.txt`;
     const dispatchBuffer = Buffer.from(dispatch, 'utf-8');
 
     const dispatchUploadRes = await fetch(

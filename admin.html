@@ -1540,7 +1540,7 @@ function renderOrders() {
     html += `
       <tr>
         <td>${fmtDate(o.created_at)}</td>
-        <td><strong>${esc(o.order_number || o.id || '')}</strong></td>
+        <td><strong>${o.dispatch_number ? '#' + o.dispatch_number : esc(o.id?.slice(0,8) || '')}</strong></td>
         <td>${esc(o.customer_name || o.name || '')}</td>
         <td>${esc(o.company || '')}</td>
         <td>${fmtMoney(o.total)}</td>
@@ -1752,7 +1752,7 @@ async function generateDispatchNote(orderId) {
     doc.setFontSize(11);
     doc.setTextColor(...black);
     doc.setFont('helvetica', 'bold');
-    const ordNum = order.order_number || order.id?.slice(0, 8) || '--';
+    const ordNum = order.dispatch_number ? '#' + order.dispatch_number : (order.id?.slice(0, 8) || '--');
     doc.text(String(ordNum), margin, y);
     doc.setFont('helvetica', 'normal');
     const orderDate = order.created_at ? new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '--';
@@ -1899,7 +1899,8 @@ async function generateDispatchNote(orderId) {
     // ── Save ──
     const companySlug = (order.company || 'Order').replace(/[^a-zA-Z0-9]/g, '_');
     const dateStr = new Date().toISOString().slice(0, 10);
-    doc.save(`Dispatch_${companySlug}_${dateStr}.pdf`);
+    const dispNum = order.dispatch_number || 'NA';
+    doc.save(`Dispatch_${dispNum}_${companySlug}_${dateStr}.pdf`);
 
   } catch (err) {
     console.error('Dispatch note error:', err);
