@@ -334,6 +334,19 @@ async function supaSetCustomerPrice(customerId, productCode, presentation, unitP
   return { success: true, price: data };
 }
 
+// Update a default price (admin override for all customers)
+async function supaUpdateDefaultPrice(productCode, presentation, unitPrice) {
+  const db = getSupabase();
+  const { data, error } = await db.from('default_prices')
+    .update({ unit_price: unitPrice, updated_at: new Date().toISOString() })
+    .eq('product_code', productCode)
+    .eq('presentation', presentation)
+    .select()
+    .single();
+  if (error) return { success: false, error: error.message };
+  return { success: true, price: data };
+}
+
 // Delete a customer price override (revert to default)
 async function supaDeleteCustomerPrice(priceId) {
   const db = getSupabase();

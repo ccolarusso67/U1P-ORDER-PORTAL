@@ -1195,12 +1195,23 @@ function renderDefaultPrices() {
             </div>
           </td>`;
       }
+      const defId = `def-${code}-${pres.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const defPriceCell = `
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="color:#666">$</span>
+            <input type="number" id="${defId}" step="0.01" min="0" value="${Number(presentations[pres]).toFixed(2)}"
+                   style="width:90px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:13px" />
+            <button class="btn btn-primary btn-sm" style="padding:4px 10px;font-size:11px"
+                    onclick="saveDefaultPrice('${esc(code)}','${esc(pres)}','${defId}')">Save</button>
+          </div>
+        </td>`;
       rows.push(`
         <tr>
           <td>${esc(code)}</td>
           <td>${esc(prodName)}</td>
           <td>${esc(pres)}</td>
-          <td>${fmtMoney(presentations[pres])}</td>
+          ${defPriceCell}
           ${customCell}
         </tr>
       `);
@@ -1230,6 +1241,33 @@ async function saveInlineOverride(code, pres, inputId) {
     renderDefaultPrices();
   } catch (e) {
     alert('Error saving price: ' + e.message);
+  }
+  hideLoading();
+}
+
+async function saveDefaultPrice(code, pres, inputId) {
+  const input = document.getElementById(inputId);
+  const price = parseFloat(input.value);
+  if (isNaN(price) || price < 0) return alert('Please enter a valid price.');
+
+  const oldPrice = defaultPrices[code] && defaultPrices[code][pres];
+  if (oldPrice !== undefined && Number(oldPrice).toFixed(2) === price.toFixed(2)) return; // no change
+
+  if (!confirm(`Update default price for ${code} — ${pres} to $${price.toFixed(2)}?\n\nThis will change the base price for ALL customers who don't have a custom price override.`)) return;
+
+  showLoading();
+  try {
+    const result = await supaUpdateDefaultPrice(code, pres, price);
+    if (!result.success) throw new Error(result.error);
+    // Update local cache
+    if (!defaultPrices[code]) defaultPrices[code] = {};
+    defaultPrices[code][pres] = price;
+    // Flash the input green briefly to confirm
+    input.style.borderColor = 'var(--green)';
+    input.style.background = '#f0fff4';
+    setTimeout(() => { input.style.borderColor = '#ddd'; input.style.background = ''; }, 1500);
+  } catch (e) {
+    alert('Error saving default price: ' + e.message);
   }
   hideLoading();
 }
