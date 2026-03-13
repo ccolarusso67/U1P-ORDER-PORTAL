@@ -1044,6 +1044,28 @@ async function submitOrder() {
     return showAlert(alertEl, 'Failed to save order: ' + result.error);
   }
 
+  // Send email notification via Netlify Function
+  try {
+    await fetch('/.netlify/functions/send-order-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name, company, email, phone, address, notes,
+        total: grandTotal > 0 ? grandTotal : null,
+        orderId: result.orderId,
+        items: orderItems.map(item => ({
+          code: item.code,
+          presentation: item.presentation,
+          sku: item.sku,
+          qty: item.qty,
+          unitPrice: item.unitPrice
+        }))
+      })
+    });
+  } catch (e) {
+    console.warn('Email notification failed:', e);
+  }
+
   // Also send mailto as backup
   const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const line = '─'.repeat(60);
