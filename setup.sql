@@ -32,6 +32,7 @@ CREATE TABLE presentations (
   product_code text NOT NULL REFERENCES products(code) ON DELETE CASCADE,
   presentation text NOT NULL,
   sku text NOT NULL,
+  weight_lbs numeric(10,2) DEFAULT NULL,
   created_at timestamptz DEFAULT now(),
   UNIQUE(product_code, presentation)
 );
@@ -97,7 +98,8 @@ CREATE TABLE order_items (
   sku text,
   qty integer NOT NULL,
   unit_price numeric(10,2),
-  line_total numeric(10,2)
+  line_total numeric(10,2),
+  weight_lbs numeric(10,2) DEFAULT NULL
 );
 
 -- ═══════════════════════════════════════════════════════════════

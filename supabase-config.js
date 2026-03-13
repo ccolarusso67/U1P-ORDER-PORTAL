@@ -61,7 +61,7 @@ async function supaGetProducts() {
 
   const { data: pres, error: prErr } = await db
     .from('presentations')
-    .select('product_code, presentation, sku')
+    .select('product_code, presentation, sku, weight_lbs')
     .order('product_code');
 
   if (prErr) { console.error('Failed to load presentations:', prErr); return {}; }
@@ -73,7 +73,7 @@ async function supaGetProducts() {
       name: p.name,
       presentations: pres
         .filter(pr => pr.product_code === p.code)
-        .map(pr => ({ presentation: pr.presentation, sku: pr.sku }))
+        .map(pr => ({ presentation: pr.presentation, sku: pr.sku, weight_lbs: pr.weight_lbs ? parseFloat(pr.weight_lbs) : null }))
     };
   }
   return result;
@@ -155,7 +155,8 @@ async function supaSubmitOrder(orderData, items) {
     sku:          item.sku,
     qty:          item.qty,
     unit_price:   item.unitPrice,
-    line_total:   item.unitPrice != null ? item.unitPrice * item.qty : null
+    line_total:   item.unitPrice != null ? item.unitPrice * item.qty : null,
+    weight_lbs:   item.weightLbs || null
   }));
 
   const { error: liErr } = await db
@@ -332,6 +333,19 @@ async function supaSetCustomerPrice(customerId, productCode, presentation, unitP
   }, { onConflict: 'customer_id,product_code,presentation' }).select().single();
   if (error) return { success: false, error: error.message };
   return { success: true, price: data };
+}
+
+// Update weight for a presentation
+async function supaUpdatePresentationWeight(productCode, presentation, weightLbs) {
+  const db = getSupabase();
+  const { data, error } = await db.from('presentations')
+    .update({ weight_lbs: weightLbs })
+    .eq('product_code', productCode)
+    .eq('presentation', presentation)
+    .select()
+    .single();
+  if (error) return { success: false, error: error.message };
+  return { success: true, data };
 }
 
 // Update a default price (admin override for all customers)

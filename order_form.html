@@ -637,6 +637,7 @@
             <th>Product Name</th>
             <th>Presentation</th>
             <th class="center">Qty</th>
+            <th class="right">Weight</th>
             <th class="right">Unit Price</th>
             <th class="right">Line Total</th>
             <th></th>
@@ -644,7 +645,7 @@
         </thead>
         <tbody id="order-tbody">
           <tr id="empty-row">
-            <td colspan="9">
+            <td colspan="10">
               <div class="empty-state">
                 <div class="empty-icon">&#128722;</div>
                 <p>No products added yet.<br>Use the selector above to add items to your order.</p>
@@ -657,6 +658,9 @@
     <div class="summary-bar" id="summary-bar" style="display:none">
       <div class="line-count">
         Line items: <span id="item-count">0</span>
+      </div>
+      <div class="order-total" id="order-weight-bar" style="display:none">
+        Total Weight: <span id="order-total-weight">0 lbs</span>
       </div>
       <div class="order-total" id="order-total-bar" style="display:none">
         Order Total: <span id="order-grand-total">$0.00</span>
@@ -743,6 +747,14 @@ function lookupPrice(code, presentation) {
   if (DEFAULT_PRICES[code]) {
     const p = DEFAULT_PRICES[code][presentation];
     if (p != null) return p;
+  }
+  return null;
+}
+
+function lookupWeight(code, presentation) {
+  if (PRODUCTS[code] && PRODUCTS[code].presentations) {
+    const p = PRODUCTS[code].presentations.find(pr => pr.presentation === presentation);
+    if (p && p.weight_lbs != null) return p.weight_lbs;
   }
   return null;
 }
@@ -897,12 +909,13 @@ function addToOrder() {
   const sku = opt ? (opt.dataset.sku || '') : '';
 
   const unitPrice = lookupPrice(selectedCode, presSelect.value);
+  const weightLbs = lookupWeight(selectedCode, presSelect.value);
 
   const existing = orderItems.find(i => i.code === selectedCode && i.presentation === presSelect.value);
   if (existing) {
     existing.qty += qty;
   } else {
-    orderItems.push({ code: selectedCode, name: selectedName, presentation: presSelect.value, sku, qty, unitPrice });
+    orderItems.push({ code: selectedCode, name: selectedName, presentation: presSelect.value, sku, qty, unitPrice, weightLbs });
   }
 
   renderTable();
@@ -936,16 +949,24 @@ function renderTable() {
   tbody.innerHTML = '';
   let grandTotal = 0;
   let hasAnyPrice = false;
+  let totalWeightLbs = 0;
+  let hasAnyWeight = false;
 
   orderItems.forEach((item, idx) => {
     const lineTotal = (item.unitPrice != null) ? item.unitPrice * item.qty : null;
     if (lineTotal != null) { grandTotal += lineTotal; hasAnyPrice = true; }
+
+    const lineWeight = (item.weightLbs != null) ? item.weightLbs * item.qty : null;
+    if (lineWeight != null) { totalWeightLbs += lineWeight; hasAnyWeight = true; }
 
     const priceCell = item.unitPrice != null
       ? `<td class="price-cell">${fmtMoney(item.unitPrice)}</td>`
       : `<td class="na-cell">—</td>`;
     const totalCell = lineTotal != null
       ? `<td class="total-cell">${fmtMoney(lineTotal)}</td>`
+      : `<td class="na-cell">—</td>`;
+    const weightCell = lineWeight != null
+      ? `<td class="price-cell" style="text-align:right">${lineWeight.toFixed(1)} lbs</td>`
       : `<td class="na-cell">—</td>`;
 
     const tr = document.createElement('tr');
@@ -956,6 +977,7 @@ function renderTable() {
       <td>${item.name}</td>
       <td>${item.presentation}</td>
       <td class="qty-cell">${item.qty}</td>
+      ${weightCell}
       ${priceCell}
       ${totalCell}
       <td><button class="btn btn-outline" onclick="removeItem(${idx})">Remove</button></td>
@@ -973,6 +995,18 @@ function renderTable() {
     totalBar.style.display = '';
   } else {
     totalBar.style.display = 'none';
+  }
+
+  // Show total weight
+  const weightBar = document.getElementById('order-weight-bar');
+  if (weightBar) {
+    if (hasAnyWeight) {
+      const kg = (totalWeightLbs * 0.453592).toFixed(1);
+      document.getElementById('order-total-weight').textContent = `${totalWeightLbs.toFixed(1)} lbs (${kg} kg)`;
+      weightBar.style.display = '';
+    } else {
+      weightBar.style.display = 'none';
+    }
   }
 }
 
@@ -1059,7 +1093,8 @@ async function submitOrder() {
           presentation: item.presentation,
           sku: item.sku,
           qty: item.qty,
-          unitPrice: item.unitPrice
+          unitPrice: item.unitPrice,
+          weightLbs: item.weightLbs
         }))
       })
     });

@@ -600,7 +600,12 @@
     <div class="mt-32">
       <div class="section-header">
         <h2 class="section-title">Default Price List</h2>
+        <div class="flex-row gap-8">
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('weight-csv-input').click()">Upload Weights CSV</button>
+          <input type="file" id="weight-csv-input" accept=".csv" style="display:none" onchange="handleWeightUpload(this)" />
+        </div>
       </div>
+      <div id="weight-upload-alert" class="alert"></div>
       <p id="default-price-hint" class="text-muted" style="font-size:.82rem;margin:8px 0 0">
         Select a customer above to set custom prices directly from this list.
       </p>
@@ -614,6 +619,7 @@
             <th>Product Name</th>
             <th>Presentation</th>
             <th>Default Price</th>
+            <th style="min-width:160px">Weight (lbs)</th>
             <th id="custom-price-col" style="display:none;min-width:160px">Customer Price</th>
           </tr>
         </thead>
@@ -1206,19 +1212,35 @@ function renderDefaultPrices() {
                     onclick="saveDefaultPrice('${esc(code)}','${esc(pres)}','${defId}')">Save</button>
           </div>
         </td>`;
+      // Weight cell
+      const presObj = products[code] && products[code].presentations ? products[code].presentations.find(p => p.presentation === pres) : null;
+      const currentWeight = presObj && presObj.weight_lbs != null ? Number(presObj.weight_lbs).toFixed(2) : '';
+      const wtId = `wt-${code}-${pres.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const weightCell = `
+        <td>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" id="${wtId}" step="0.01" min="0" value="${currentWeight}"
+                   placeholder="—"
+                   style="width:80px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:13px${currentWeight ? ';border-color:#1a6b3c;background:#f0fff4' : ''}" />
+            <span style="color:#999;font-size:11px">lbs</span>
+            <button class="btn btn-primary btn-sm" style="padding:4px 10px;font-size:11px"
+                    onclick="saveWeight('${esc(code)}','${esc(pres)}','${wtId}')">Save</button>
+          </div>
+        </td>`;
       rows.push(`
         <tr>
           <td>${esc(code)}</td>
           <td>${esc(prodName)}</td>
           <td>${esc(pres)}</td>
           ${defPriceCell}
+          ${weightCell}
           ${customCell}
         </tr>
       `);
     });
   });
 
-  const colSpan = hasCustomer ? 5 : 4;
+  const colSpan = hasCustomer ? 6 : 5;
   if (rows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-muted" style="padding:24px">No prices found</td></tr>`;
   } else {
@@ -1268,6 +1290,91 @@ async function saveDefaultPrice(code, pres, inputId) {
     setTimeout(() => { input.style.borderColor = '#ddd'; input.style.background = ''; }, 1500);
   } catch (e) {
     alert('Error saving default price: ' + e.message);
+  }
+  hideLoading();
+}
+
+async function saveWeight(code, pres, inputId) {
+  const input = document.getElementById(inputId);
+  const weight = parseFloat(input.value);
+  if (input.value.trim() === '') return; // empty = no change
+  if (isNaN(weight) || weight < 0) return alert('Please enter a valid weight.');
+
+  showLoading();
+  try {
+    const result = await supaUpdatePresentationWeight(code, pres, weight);
+    if (!result.success) throw new Error(result.error);
+    // Update local cache
+    if (products[code] && products[code].presentations) {
+      const p = products[code].presentations.find(pr => pr.presentation === pres);
+      if (p) p.weight_lbs = weight;
+    }
+    input.style.borderColor = 'var(--green)';
+    input.style.background = '#f0fff4';
+    setTimeout(() => { input.style.borderColor = '#1a6b3c'; input.style.background = '#f0fff4'; }, 1500);
+  } catch (e) {
+    alert('Error saving weight: ' + e.message);
+  }
+  hideLoading();
+}
+
+async function handleWeightUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+
+  showLoading();
+  try {
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) { hideLoading(); return showAlert('weight-upload-alert', 'No data rows found.', 'error'); }
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const colMap = {};
+    headers.forEach((h, i) => {
+      if (h.includes('code') || h.includes('product')) colMap.code = i;
+      else if (h.includes('presentation') || h.includes('size') || h.includes('format')) colMap.pres = i;
+      else if (h.includes('weight') || h.includes('lbs') || h.includes('lb')) colMap.weight = i;
+    });
+
+    if (colMap.code === undefined || colMap.pres === undefined || colMap.weight === undefined) {
+      hideLoading();
+      return showAlert('weight-upload-alert', 'CSV must have columns: Product Code, Presentation, Weight (lbs)', 'error');
+    }
+
+    let updated = 0, skipped = 0, errors = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i]);
+      const code = (cols[colMap.code] || '').trim();
+      const pres = (cols[colMap.pres] || '').trim();
+      const weight = parseFloat((cols[colMap.weight] || '').trim());
+
+      if (!code || !pres || isNaN(weight) || weight < 0) {
+        errors.push('Row ' + (i + 1) + ': Invalid data');
+        skipped++;
+        continue;
+      }
+
+      const result = await supaUpdatePresentationWeight(code, pres, weight);
+      if (result.success) {
+        updated++;
+        if (products[code] && products[code].presentations) {
+          const p = products[code].presentations.find(pr => pr.presentation === pres);
+          if (p) p.weight_lbs = weight;
+        }
+      } else {
+        errors.push('Row ' + (i + 1) + ': ' + code + ' ' + pres + ' — ' + result.error);
+        skipped++;
+      }
+    }
+
+    renderDefaultPrices();
+    let msg = 'Upload complete: ' + updated + ' weights updated';
+    if (skipped > 0) msg += ', ' + skipped + ' skipped';
+    if (errors.length > 0) msg += '. Issues: ' + errors.slice(0, 5).join('; ');
+    showAlert('weight-upload-alert', msg, updated > 0 ? 'success' : 'error');
+  } catch (e) {
+    showAlert('weight-upload-alert', 'Upload failed: ' + e.message, 'error');
   }
   hideLoading();
 }

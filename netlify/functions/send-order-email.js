@@ -12,40 +12,59 @@ exports.handler = async (event) => {
     const order = JSON.parse(event.body);
     const { name, company, email, phone, address, notes, items, total, orderId } = order;
 
-    // Build HTML email — 5 columns: Product (code+name), Presentation, Qty, Price, Total
+    // Calculate total weight
+    let totalWeightLbs = 0;
+    let hasWeight = false;
+    items.forEach(item => {
+      if (item.weightLbs != null) {
+        totalWeightLbs += item.weightLbs * item.qty;
+        hasWeight = true;
+      }
+    });
+    const totalWeightKg = (totalWeightLbs * 0.453592).toFixed(1);
+
+    // Build HTML email — 6 columns: Product, Presentation, Qty, Weight, Price, Total
     let itemRows = '';
     items.forEach((item, i) => {
-      const unitPrice = item.unitPrice != null ? `$${Number(item.unitPrice).toFixed(2)}` : '—';
-      const lineTotal = item.unitPrice != null ? `$${(item.unitPrice * item.qty).toFixed(2)}` : '—';
+      const unitPrice = item.unitPrice != null ? `$${Number(item.unitPrice).toFixed(2)}` : '&mdash;';
+      const lineTotal = item.unitPrice != null ? `$${(item.unitPrice * item.qty).toFixed(2)}` : '&mdash;';
+      const lineWeight = item.weightLbs != null ? `${(item.weightLbs * item.qty).toFixed(1)}` : '&mdash;';
       const productLabel = item.name ? `<strong>${item.code}</strong><br><span style="font-size:11px;color:#666;">${item.name}</span>` : `<strong>${item.code}</strong>`;
       itemRows += `
         <tr style="border-bottom:1px solid #e5e5e5;">
           <td style="padding:8px 6px;vertical-align:top;">${productLabel}</td>
           <td style="padding:8px 6px;">${item.presentation}<br><span style="font-size:11px;color:#999;">${item.sku}</span></td>
           <td style="padding:8px 6px;text-align:center;">${item.qty}</td>
+          <td style="padding:8px 6px;text-align:right;font-size:11px;">${lineWeight}</td>
           <td style="padding:8px 6px;text-align:right;">${unitPrice}</td>
           <td style="padding:8px 6px;text-align:right;font-weight:600;">${lineTotal}</td>
         </tr>`;
     });
 
     const totalDisplay = total != null ? `$${Number(total).toFixed(2)}` : 'N/A';
+    const weightDisplay = hasWeight ? `${totalWeightLbs.toFixed(1)} lbs (${totalWeightKg} kg)` : '';
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const dateShort = new Date().toISOString().slice(0, 10);
 
     // Build CSV attachment (full detail)
-    let csv = 'Product Code,Product Name,Presentation,SKU,Qty,Unit Price,Line Total\n';
+    let csv = 'Product Code,Product Name,Presentation,SKU,Qty,Weight (lbs),Weight (kg),Unit Price,Line Total\n';
+    const escapeCsv = (v) => {
+      const s = String(v || '');
+      return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+    };
     items.forEach(item => {
       const up = item.unitPrice != null ? item.unitPrice : '';
       const lt = item.unitPrice != null ? (item.unitPrice * item.qty).toFixed(2) : '';
-      const escapeCsv = (v) => {
-        const s = String(v || '');
-        return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
-      };
-      csv += `${escapeCsv(item.code)},${escapeCsv(item.name)},${escapeCsv(item.presentation)},${escapeCsv(item.sku)},${item.qty},${up},${lt}\n`;
+      const wLbs = item.weightLbs != null ? (item.weightLbs * item.qty).toFixed(2) : '';
+      const wKg = item.weightLbs != null ? (item.weightLbs * item.qty * 0.453592).toFixed(2) : '';
+      csv += `${escapeCsv(item.code)},${escapeCsv(item.name)},${escapeCsv(item.presentation)},${escapeCsv(item.sku)},${item.qty},${wLbs},${wKg},${up},${lt}\n`;
     });
-    if (total != null) {
-      csv += `,,,,,,${Number(total).toFixed(2)}\n`;
-    }
+    // Totals row
+    const totalCsvWeight = hasWeight ? totalWeightLbs.toFixed(2) : '';
+    const totalCsvWeightKg = hasWeight ? totalWeightKg : '';
+    const totalCsvPrice = total != null ? Number(total).toFixed(2) : '';
+    csv += `,,,,TOTALS,${totalCsvWeight},${totalCsvWeightKg},,${totalCsvPrice}\n`;
+
     const csvBase64 = Buffer.from(csv).toString('base64');
     const filename = `Order_${company.replace(/[^a-zA-Z0-9]/g, '_')}_${dateShort}.csv`;
 
@@ -78,13 +97,16 @@ exports.handler = async (event) => {
             <tr style="background:#000;color:#FFC700;">
               <th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:700;">PRODUCT</th>
               <th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:700;">PRESENTATION</th>
-              <th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:700;width:36px;">QTY</th>
-              <th style="padding:8px 6px;text-align:right;font-size:11px;font-weight:700;width:64px;">PRICE</th>
-              <th style="padding:8px 6px;text-align:right;font-size:11px;font-weight:700;width:72px;">TOTAL</th>
+              <th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:700;width:30px;">QTY</th>
+              <th style="padding:8px 6px;text-align:right;font-size:11px;font-weight:700;width:50px;">WEIGHT</th>
+              <th style="padding:8px 6px;text-align:right;font-size:11px;font-weight:700;width:60px;">PRICE</th>
+              <th style="padding:8px 6px;text-align:right;font-size:11px;font-weight:700;width:68px;">TOTAL</th>
             </tr>
             ${itemRows}
             <tr style="background:#f6f6f6;">
-              <td colspan="4" style="padding:10px 6px;text-align:right;font-weight:700;font-size:12px;">ESTIMATED TOTAL:</td>
+              <td colspan="3" style="padding:10px 6px;text-align:right;font-weight:700;font-size:12px;">${hasWeight ? 'TOTALS:' : 'ESTIMATED TOTAL:'}</td>
+              <td style="padding:10px 6px;text-align:right;font-weight:700;font-size:11px;">${weightDisplay}</td>
+              <td style="padding:10px 6px;"></td>
               <td style="padding:10px 6px;text-align:right;font-weight:700;font-size:13px;">${totalDisplay}</td>
             </tr>
           </table>
