@@ -12,21 +12,19 @@ exports.handler = async (event) => {
     const order = JSON.parse(event.body);
     const { name, company, email, phone, address, notes, items, total, orderId } = order;
 
-    // Build HTML email
+    // Build HTML email — 5 columns: Product (code+name), Presentation, Qty, Price, Total
     let itemRows = '';
     items.forEach((item, i) => {
       const unitPrice = item.unitPrice != null ? `$${Number(item.unitPrice).toFixed(2)}` : '—';
       const lineTotal = item.unitPrice != null ? `$${(item.unitPrice * item.qty).toFixed(2)}` : '—';
+      const productLabel = item.name ? `<strong>${item.code}</strong><br><span style="font-size:11px;color:#666;">${item.name}</span>` : `<strong>${item.code}</strong>`;
       itemRows += `
         <tr style="border-bottom:1px solid #e5e5e5;">
-          <td style="padding:6px 4px;text-align:center;">${i + 1}</td>
-          <td style="padding:6px 4px;">${item.code}</td>
-          <td style="padding:6px 4px;font-size:11px;color:#666;word-break:break-word;">${item.name || ''}</td>
-          <td style="padding:6px 4px;">${item.presentation}</td>
-          <td style="padding:6px 4px;">${item.sku}</td>
-          <td style="padding:6px 4px;text-align:center;">${item.qty}</td>
-          <td style="padding:6px 4px;text-align:right;">${unitPrice}</td>
-          <td style="padding:6px 4px;text-align:right;font-weight:600;">${lineTotal}</td>
+          <td style="padding:8px 6px;vertical-align:top;">${productLabel}</td>
+          <td style="padding:8px 6px;">${item.presentation}<br><span style="font-size:11px;color:#999;">${item.sku}</span></td>
+          <td style="padding:8px 6px;text-align:center;">${item.qty}</td>
+          <td style="padding:8px 6px;text-align:right;">${unitPrice}</td>
+          <td style="padding:8px 6px;text-align:right;font-weight:600;">${lineTotal}</td>
         </tr>`;
     });
 
@@ -34,7 +32,7 @@ exports.handler = async (event) => {
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const dateShort = new Date().toISOString().slice(0, 10);
 
-    // Build CSV attachment
+    // Build CSV attachment (full detail)
     let csv = 'Product Code,Product Name,Presentation,SKU,Qty,Unit Price,Line Total\n';
     items.forEach(item => {
       const up = item.unitPrice != null ? item.unitPrice : '';
@@ -52,62 +50,55 @@ exports.handler = async (event) => {
     const filename = `Order_${company.replace(/[^a-zA-Z0-9]/g, '_')}_${dateShort}.csv`;
 
     const html = `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:700px;margin:0 auto;font-family:Arial,sans-serif;">
+    <!DOCTYPE html>
+    <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="margin:0;padding:0;background:#f4f4f4;">
+    <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" align="center"><tr><td><![endif]-->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;font-size:14px;">
     <tr><td>
-      <div style="background:#000;padding:20px 30px;text-align:center;">
-        <img src="https://cdn11.bigcommerce.com/s-w94u0bjkb6/images/stencil/original/recurso_1_1757027375__15872.original.png" alt="Ultra1Plus" style="height:40px;" />
-      </div>
-      <div style="background:#FFC700;padding:12px 30px;">
-        <h2 style="margin:0;font-size:18px;color:#000;">New Order Received</h2>
-      </div>
-      <div style="padding:24px 30px;background:#fff;overflow-x:auto;">
-        <p style="margin:0 0 16px;color:#333;font-size:14px;"><strong>Date:</strong> ${date}</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="background:#000;padding:20px 24px;text-align:center;">
+          <img src="https://cdn11.bigcommerce.com/s-w94u0bjkb6/images/stencil/original/recurso_1_1757027375__15872.original.png" alt="Ultra1Plus" width="150" style="height:auto;display:block;margin:0 auto;" />
+        </td></tr>
+        <tr><td style="background:#FFC700;padding:10px 24px;">
+          <h2 style="margin:0;font-size:16px;color:#000;font-family:Arial,Helvetica,sans-serif;">New Order Received</h2>
+        </td></tr>
+        <tr><td style="background:#fff;padding:20px 24px;">
+          <p style="margin:0 0 14px;color:#333;font-size:13px;"><strong>Date:</strong> ${date}</p>
 
-        <table style="width:100%;margin-bottom:20px;font-size:14px;">
-          <tr><td style="padding:4px 0;color:#666;width:100px;">Name:</td><td style="padding:4px 0;font-weight:600;">${name}</td></tr>
-          <tr><td style="padding:4px 0;color:#666;">Company:</td><td style="padding:4px 0;font-weight:600;">${company}</td></tr>
-          <tr><td style="padding:4px 0;color:#666;">Email:</td><td style="padding:4px 0;"><a href="mailto:${email}">${email}</a></td></tr>
-          ${phone ? `<tr><td style="padding:4px 0;color:#666;">Phone:</td><td style="padding:4px 0;">${phone}</td></tr>` : ''}
-          ${address ? `<tr><td style="padding:4px 0;color:#666;">Ship To:</td><td style="padding:4px 0;">${address}</td></tr>` : ''}
-        </table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:18px;font-size:13px;">
+            <tr><td style="padding:3px 0;color:#666;width:70px;">Name:</td><td style="padding:3px 0;font-weight:600;">${name}</td></tr>
+            <tr><td style="padding:3px 0;color:#666;">Company:</td><td style="padding:3px 0;font-weight:600;">${company}</td></tr>
+            <tr><td style="padding:3px 0;color:#666;">Email:</td><td style="padding:3px 0;"><a href="mailto:${email}" style="color:#1a6b3c;">${email}</a></td></tr>
+            ${phone ? `<tr><td style="padding:3px 0;color:#666;">Phone:</td><td style="padding:3px 0;">${phone}</td></tr>` : ''}
+            ${address ? `<tr><td style="padding:3px 0;color:#666;">Ship To:</td><td style="padding:3px 0;">${address}</td></tr>` : ''}
+          </table>
 
-        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;table-layout:fixed;">
-          <colgroup>
-            <col style="width:24px;">
-            <col style="width:56px;">
-            <col style="width:auto;">
-            <col style="width:90px;">
-            <col style="width:80px;">
-            <col style="width:32px;">
-            <col style="width:68px;">
-            <col style="width:72px;">
-          </colgroup>
-          <thead>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:12px;margin-bottom:14px;">
             <tr style="background:#000;color:#FFC700;">
-              <th style="padding:8px 4px;text-align:center;">#</th>
-              <th style="padding:8px 4px;text-align:left;">Code</th>
-              <th style="padding:8px 4px;text-align:left;">Product Name</th>
-              <th style="padding:8px 4px;text-align:left;">Presentation</th>
-              <th style="padding:8px 4px;text-align:left;">SKU</th>
-              <th style="padding:8px 4px;text-align:center;">Qty</th>
-              <th style="padding:8px 4px;text-align:right;">Price</th>
-              <th style="padding:8px 4px;text-align:right;">Total</th>
+              <th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:700;">PRODUCT</th>
+              <th style="padding:8px 6px;text-align:left;font-size:11px;font-weight:700;">PRESENTATION</th>
+              <th style="padding:8px 6px;text-align:center;font-size:11px;font-weight:700;width:36px;">QTY</th>
+              <th style="padding:8px 6px;text-align:right;font-size:11px;font-weight:700;width:64px;">PRICE</th>
+              <th style="padding:8px 6px;text-align:right;font-size:11px;font-weight:700;width:72px;">TOTAL</th>
             </tr>
-          </thead>
-          <tbody>${itemRows}</tbody>
-          <tfoot>
-            <tr style="background:#f6f6f6;font-weight:700;">
-              <td colspan="7" style="padding:10px 8px;text-align:right;">ESTIMATED TOTAL:</td>
-              <td style="padding:10px 8px;text-align:right;">${totalDisplay}</td>
+            ${itemRows}
+            <tr style="background:#f6f6f6;">
+              <td colspan="4" style="padding:10px 6px;text-align:right;font-weight:700;font-size:12px;">ESTIMATED TOTAL:</td>
+              <td style="padding:10px 6px;text-align:right;font-weight:700;font-size:13px;">${totalDisplay}</td>
             </tr>
-          </tfoot>
-        </table>
+          </table>
 
-        ${notes ? `<div style="background:#f6f6f6;padding:12px 16px;border-left:3px solid #FFC700;margin-bottom:16px;font-size:14px;"><strong>Notes:</strong> ${notes}</div>` : ''}
+          ${notes ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;"><tr><td style="background:#f6f6f6;padding:10px 14px;border-left:3px solid #FFC700;font-size:13px;"><strong>Notes:</strong> ${notes}</td></tr></table>` : ''}
 
-        <p style="font-size:12px;color:#999;margin-top:24px;">This order was placed via the Ultra1Plus Distributor Portal.</p>
-      </div>
-    </td></tr></table>`;
+          <p style="font-size:11px;color:#999;margin:18px 0 0;">This order was placed via the Ultra1Plus Distributor Portal.</p>
+          <p style="font-size:11px;color:#999;margin:4px 0 0;">Full order details are attached as a CSV file.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+    </table>
+    <!--[if mso]></td></tr></table><![endif]-->
+    </body></html>`;
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
